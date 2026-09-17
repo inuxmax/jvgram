@@ -11,6 +11,13 @@
   }
 }
 
+#middle-column-portals .Notification-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+}
+
 .Notification {
   --color-toast-action: var(--color-primary);
 
@@ -75,4 +82,9 @@
     color: var(--color-toast-action);
     text-transform: none;
   }
+}
+
+#middle-column-portals .Notification {
+  width: auto;
+  max-width: calc(100% - 1rem);
 }

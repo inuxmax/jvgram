@@ -184,6 +184,7 @@ export default defineConfig(({ mode }): UserConfig => {
     TG_TELEGRAM_API_ID: telegramApiId,
     TG_TELEGRAM_API_HASH: telegramApiHash,
     TG_TEST_SESSION: env.TEST_SESSION || '',
+    TG_ADMIN_API_URL: appEnv === 'development' ? (env.ADMIN_API_URL || 'http://localhost:3000') : '',
   });
 
   return {

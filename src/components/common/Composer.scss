@@ -844,6 +844,10 @@
 
     background: none !important;
 
+    &.loading .Spinner {
+      --spinner-size: 1.125rem;
+    }
+
     &:not(.faded):not(.activated) {
       color: var(--color-composer-button);
     }

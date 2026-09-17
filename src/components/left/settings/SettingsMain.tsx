@@ -11,6 +11,8 @@ import {
   selectIsGiveawayGiftsPurchaseAvailable,
   selectIsPremiumPurchaseBlocked,
 } from '../../../global/selectors';
+import { openAccountProfiles } from '../../../util/accountProfilesUi';
+import { IS_MULTIACCOUNT_SUPPORTED } from '../../../util/browser/globalEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import { convertCurrencyFromBaseUnit } from '../../../util/formatCurrency';
 import { formatStarsAsIcon, formatTonAsIcon } from '../../../util/localization/format';
@@ -112,6 +114,19 @@ const SettingsMain: FC<OwnProps & StateProps> = ({
             <span className="title">{lang('SettingsAccount')}</span>
             <span className="subtitle">{lang('SettingsAccountDesc')}</span>
           </ListItem>
+
+          {IS_MULTIACCOUNT_SUPPORTED && (
+            <ListItem
+              icon="user-filled"
+              iconBg="green"
+              multiline
+              narrow
+              onClick={openAccountProfiles}
+            >
+              <span className="title">{lang('AirProfilesTitle')}</span>
+              <span className="subtitle">{lang('AirProfilesUnlimited')}</span>
+            </ListItem>
+          )}
 
           <ListItem
             icon="settings-filled"

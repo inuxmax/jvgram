@@ -64,12 +64,14 @@
         flex: 1;
       }
 
-      &.with-tabs > .Transition {
-        margin-top: 2rem;
+      &.with-tabs {
+        flex-direction: row;
+        align-items: stretch;
       }
 
-      &.with-tabs .chat-list {
-        padding-top: 1.875rem;
+      &.with-tabs > .Transition {
+        flex: 1;
+        min-width: 0;
       }
     }
 

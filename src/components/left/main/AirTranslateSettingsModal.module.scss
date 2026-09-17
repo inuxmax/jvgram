@@ -1,0 +1,67 @@
+.root {
+  :global(.modal-content) {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0.25rem;
+  }
+
+  :global(.input-group) {
+    margin-bottom: 1rem;
+  }
+
+  :global(.matching-text-highlight) {
+    color: var(--color-primary);
+  }
+}
+
+.isPicker {
+  :global(.modal-content) {
+    min-height: min(75vh, 32rem);
+  }
+}
+
+.pickerButton {
+  cursor: var(--custom-cursor, pointer);
+
+  overflow: hidden;
+
+  padding-right: 2.75rem;
+
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autoField {
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-secondary);
+}
+
+.languages {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  margin-inline: -0.5rem;
+}
+
+.listItem {
+  text-align: left;
+
+  &[dir="rtl"] {
+    text-align: right;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hint {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-text-secondary);
+}

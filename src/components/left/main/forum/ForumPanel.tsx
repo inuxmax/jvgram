@@ -1,6 +1,6 @@
 import {
   beginHeavyAnimation,
-  memo, useCallback, useEffect, useMemo, useRef, useState,
+  memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
 } from '../../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../../global';
 
@@ -95,6 +95,8 @@ const ForumPanel = ({
 
   const containerRef = useRef<HTMLDivElement>();
   const scrollTopHandlerRef = useRef<HTMLDivElement>();
+  const lastIndicatorTopRef = useRef(0);
+  const [isIndicatorReady, setIsIndicatorReady] = useState(false);
   const { isMobile } = useAppLayout();
   const chatId = chat?.id;
   const listedTopicIds = topicsInfo?.listedTopicIds;
@@ -160,6 +162,30 @@ const ForumPanel = ({
 
     return [MAIN_THREAD_ID, ...ids];
   }, [chat?.isBotForum, listedTopics, topicsInfo?.orderedPinnedTopicIds, topicsThreads]);
+
+  const selectedIndex = currentTopicId !== undefined && orderedIds
+    ? orderedIds.indexOf(currentTopicId)
+    : -1;
+  const indicatorTop = !isMobile && selectedIndex >= 0
+    ? selectedIndex * TOPIC_HEIGHT_PX
+    : undefined;
+
+  useLayoutEffect(() => {
+    if (indicatorTop === undefined) {
+      setIsIndicatorReady(false);
+      return;
+    }
+
+    lastIndicatorTopRef.current = indicatorTop;
+  }, [indicatorTop]);
+
+  useEffect(() => {
+    if (indicatorTop === undefined) {
+      return;
+    }
+
+    setIsIndicatorReady(true);
+  }, [indicatorTop]);
 
   const { orderDiffById, shiftDiff, getAnimationType, onReorderAnimationEnd } = useOrderDiff(orderedIds, 0, chat?.id);
   const loadedListedTopicCount = listedTopicIds?.length ?? 0;
@@ -317,7 +343,7 @@ const ForumPanel = ({
       <div className={styles.notch} />
 
       <InfiniteScroll
-        className="chat-list custom-scroll"
+        className="chat-list custom-scroll topic-list"
         ref={containerRef}
         items={viewportIds}
         preloadBackwards={TOPICS_SLICE}
@@ -327,6 +353,17 @@ const ForumPanel = ({
         sensitiveArea={TOPIC_LIST_SENSITIVE_AREA}
         beforeChildren={<div ref={scrollTopHandlerRef} className={styles.scrollTopHandler} />}
       >
+        {!isMobile && Boolean(viewportIds?.length) && (
+          <div
+            key="selection-indicator"
+            className={buildClassName(
+              'chat-list-indicator',
+              indicatorTop !== undefined && isIndicatorReady && 'shown',
+            )}
+            style={`transform: translate3d(0, ${indicatorTop ?? lastIndicatorTopRef.current}px, 0)`}
+            aria-hidden
+          />
+        )}
         {Boolean(viewportIds?.length) && (
           renderTopics()
         )}

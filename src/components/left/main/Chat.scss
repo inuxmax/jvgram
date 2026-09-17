@@ -9,6 +9,7 @@
   --z-status: 8; // Avatar stories require a higher z-index than the ripple to work
 
   position: absolute;
+  z-index: 1;
   top: 0;
   left: 0;
 
@@ -230,10 +231,19 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    transition: opacity 300ms ease, transform var(--layer-transition);
+    transition: opacity 300ms ease, transform var(--layer-transition), color var(--chat-selection-transition, 0s);
 
     body.no-page-transitions & {
       transition: opacity 300ms ease;
+
+      .icon-muted,
+      .general-forum-icon,
+      .last-message,
+      .typing-status,
+      .LastMessageMeta .time,
+      .LastMessageMeta .MessageOutgoingStatus {
+        transition: none;
+      }
     }
 
     &.has-tags {
@@ -248,25 +258,37 @@
 
     .title .custom-emoji {
       color: var(--color-primary);
+      transition: color var(--chat-selection-transition, 0s);
+    }
+
+    .LastMessageMeta .time,
+    .LastMessageMeta .MessageOutgoingStatus {
+      transition: color var(--chat-selection-transition, 0s);
     }
 
     .icon-muted {
       margin-left: 0.25rem;
       font-size: 1.125rem;
       color: var(--color-list-icon);
+      transition: color var(--chat-selection-transition, 0s);
     }
 
     .general-forum-icon {
       font-size: 1.25rem;
       color: var(--color-text-secondary);
+      transition: color var(--chat-selection-transition, 0s);
     }
 
     .last-message,
     .typing-status {
       unicode-bidi: plaintext;
       flex-grow: 1;
+
       padding-right: 0.25rem;
+
       color: var(--color-text-secondary);
+
+      transition: color var(--chat-selection-transition, 0s);
 
       &[dir="ltr"] {
         text-align: left;
@@ -412,6 +434,11 @@
   }
 
   @media (min-width: 600px) {
+    .ChatFolders &:not(.forum) .ListItem-button,
+    .topic-list &:not(.forum) .ListItem-button {
+      --background-color: transparent;
+    }
+
     &.selected:not(.forum),
     &.selected:not(.forum):hover {
       --background-color: var(--color-chat-active) !important;
@@ -437,7 +464,8 @@
         border-color: var(--color-chat-active) !important;
       }
 
-      .ListItem-button {
+      .ListItem-button,
+      .ListItem-button:active {
         --background-color: var(--color-chat-active) !important;
         --color-text: var(--color-white);
         --color-text-meta-colored: var(--color-white);
@@ -469,6 +497,15 @@
         color: var(--color-chat-active);
         background-color: #ffffffab;
       }
+    }
+
+    .ChatFolders &.selected:not(.forum) .ListItem-button,
+    .ChatFolders &.selected:not(.forum) .ListItem-button:active,
+    .ChatFolders &.selected:not(.forum):hover .ListItem-button,
+    .topic-list &.selected:not(.forum) .ListItem-button,
+    .topic-list &.selected:not(.forum) .ListItem-button:active,
+    .topic-list &.selected:not(.forum):hover .ListItem-button {
+      --background-color: transparent !important;
     }
   }
 

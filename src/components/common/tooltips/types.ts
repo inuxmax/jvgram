@@ -13,6 +13,7 @@ import type {
 } from '../../../api/types';
 import type { GlobalActions } from '../../../global';
 import type { InlineBotSettings, ThreadId } from '../../../types';
+import type { AirQuickReply } from '../../../util/airQuickReplies';
 
 export type RichEditorTooltipContext = {
   chatId: string;
@@ -29,6 +30,7 @@ export type RichEditorTooltipContext = {
   botCommands?: ApiBotCommand[] | false;
   chatBotCommands?: ApiBotCommand[];
   quickReplies?: Record<number, ApiQuickReply>;
+  airQuickReplies?: AirQuickReply[];
   quickReplyMessages?: Record<number, ApiMessage>;
   isSavedMessages?: boolean;
   isInScheduledList?: boolean;
@@ -46,6 +48,7 @@ export type RichEditorTooltipItem =
   | ApiUser
   | ApiBotCommand
   | ApiQuickReply
+  | AirQuickReply
   | ApiBotInlineResult
   | ApiBotInlineMediaResult;
 

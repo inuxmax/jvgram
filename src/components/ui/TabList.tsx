@@ -36,6 +36,7 @@ type OwnProps = {
   centered?: boolean;
   stretched?: boolean;
   itemAlignment?: 'vertical' | 'horizontal';
+  layout?: 'horizontal' | 'vertical';
   withFadeMask?: boolean;
   fadeMaskClassName?: string;
   onSwitchTab: (index: number) => void;
@@ -52,6 +53,7 @@ const TabList = ({
   centered,
   stretched,
   itemAlignment,
+  layout,
   withFadeMask,
   fadeMaskClassName,
   renderExtra,
@@ -65,20 +67,32 @@ const TabList = ({
   const [menuAnchor, setMenuAnchor] = useState<IAnchorPosition | undefined>();
   const [menuTabIndex, setMenuTabIndex] = useState<number | undefined>();
   const menuTargetRef = useRef<HTMLElement>();
+  const isVerticalLayout = layout === 'vertical';
 
-  useHorizontalScroll(containerRef, !tabs.length, true);
+  useHorizontalScroll(containerRef, isVerticalLayout || !tabs.length, true);
 
   const updateClipPath = useLastCallback(() => {
     const clipPathContainer = clipPathContainerRef.current;
     const activeTabEl = activeTab >= 0 && clipPathContainer?.childNodes[activeTab] as HTMLElement | undefined;
 
-    if (clipPathContainer && activeTabEl && clipPathContainer.offsetWidth > 0) {
-      const { offsetLeft, offsetWidth } = activeTabEl;
-      const containerWidth = clipPathContainer.offsetWidth;
-      const left = (offsetLeft / containerWidth * 100).toFixed(1);
-      const right = ((containerWidth - (offsetLeft + offsetWidth)) / containerWidth * 100).toFixed(1);
+    if (clipPathContainer && activeTabEl && clipPathContainer.offsetWidth > 0 && clipPathContainer.offsetHeight > 0) {
+      if (isVerticalLayout) {
+        const { offsetTop, offsetHeight } = activeTabEl;
+        const containerHeight = clipPathContainer.offsetHeight;
+        const top = (offsetTop / containerHeight * 100).toFixed(1);
+        const bottom = ((containerHeight - (offsetTop + offsetHeight)) / containerHeight * 100).toFixed(1);
 
-      setClipPath(`inset(0.25rem ${right}% 0.25rem ${left}% round var(--tab-radius))`);
+        setClipPath(
+          `inset(calc(${top}% + 0.125rem) 0.25rem calc(${bottom}% + 0.125rem) 0.25rem round var(--tab-radius))`,
+        );
+      } else {
+        const { offsetLeft, offsetWidth } = activeTabEl;
+        const containerWidth = clipPathContainer.offsetWidth;
+        const left = (offsetLeft / containerWidth * 100).toFixed(1);
+        const right = ((containerWidth - (offsetLeft + offsetWidth)) / containerWidth * 100).toFixed(1);
+
+        setClipPath(`inset(0.25rem ${right}% 0.25rem ${left}% round var(--tab-radius))`);
+      }
     } else if (activeTab < 0) {
       setClipPath('inset(0 100% 0 100%)');
     }
@@ -90,7 +104,14 @@ const TabList = ({
 
   useResizeObserver(clipPathContainerRef, updateClipPath);
 
-  useScrollToActiveTab(containerRef, activeTab);
+  useScrollToActiveTab(containerRef, isVerticalLayout ? -1 : activeTab);
+
+  useEffect(() => {
+    if (!isVerticalLayout) return;
+
+    const activeTabElement = containerRef.current?.childNodes[activeTab] as HTMLElement | undefined;
+    activeTabElement?.scrollIntoView({ block: 'nearest' });
+  }, [activeTab, isVerticalLayout]);
 
   const handleTabClick = useLastCallback((index: number) => {
     onSwitchTab(index);
@@ -177,6 +198,7 @@ const TabList = ({
         withFadeMask && styles.withFadeMask,
         centered && styles.centered,
         itemAlignment === 'vertical' && styles.vertical,
+        isVerticalLayout && styles.column,
         className,
         clipPath && styles.ready,
       )}
@@ -188,6 +210,7 @@ const TabList = ({
         className={buildClassName(styles.activeIndicator,
           centered && styles.centered,
           stretched && styles.stretched,
+          isVerticalLayout && styles.column,
           indicatorClassName)}
         style={clipPath ? `clip-path: ${clipPath}` : undefined}
         aria-hidden

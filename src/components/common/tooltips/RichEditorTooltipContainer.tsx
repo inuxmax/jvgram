@@ -20,6 +20,7 @@ import type {
 } from './types';
 
 import { selectTabState } from '../../../global/selectors';
+import { type AirQuickReply, isAirQuickReply } from '../../../util/airQuickReplies';
 import buildClassName from '../../../util/buildClassName';
 import { parseInlineBotQuery } from './extensions/richEditorTooltips/suggestion';
 
@@ -108,6 +109,7 @@ const RichEditorTooltipContainer = ({
   ) => config.sticker?.onSelect(sticker, isSilent, shouldSchedule));
   const handleStackCustomEmojiSelect = useLastCallback((emoji: ApiSticker) => customEmojiSuggestion?.command(emoji));
   const handleCommandSelect = useLastCallback((command: ApiBotCommand) => suggestion?.command(command));
+  const handleAirQuickReplySelect = useLastCallback((quickReply: AirQuickReply) => suggestion?.command(quickReply));
   const handleQuickReplySelect = useLastCallback((quickReply: ApiQuickReply) => suggestion?.command(quickReply));
   const handleInlineBotLoadMore = useLastCallback(() => {
     if (!inlineBotState || !inlineBot) {
@@ -226,7 +228,10 @@ const RichEditorTooltipContainer = ({
 
   if (surface === 'command' && context.currentUser) {
     const botCommands = suggestion.items.filter((item): item is ApiBotCommand => 'botId' in item);
-    const filteredQuickReplies = suggestion.items.filter((item): item is ApiQuickReply => 'shortcut' in item);
+    const airQuickReplies = suggestion.items.filter(isAirQuickReply);
+    const filteredQuickReplies = suggestion.items.filter((item): item is ApiQuickReply => (
+      'shortcut' in item && !isAirQuickReply(item)
+    ));
 
     return (
       <div className={buildClassName(styles.root, styles.compact, styles.command)}>
@@ -234,10 +239,12 @@ const RichEditorTooltipContainer = ({
           isOpen={isOpen}
           selectedIndex={selectedIndex}
           botCommands={botCommands}
+          airQuickReplies={airQuickReplies}
           quickReplies={filteredQuickReplies}
           quickReplyMessages={context.quickReplyMessages}
           self={context.currentUser}
           onCommandSelect={handleCommandSelect}
+          onAirQuickReplySelect={handleAirQuickReplySelect}
           onQuickReplySelect={handleQuickReplySelect}
         />
       </div>

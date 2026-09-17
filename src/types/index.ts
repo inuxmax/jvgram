@@ -54,6 +54,8 @@ export type TextPart = TeactNode;
 
 export type DcId = typeof DC_IDS[number];
 
+export type AccountProfileKind = 'personal' | 'business' | 'admin';
+
 export type SessionUserInfo = {
   userId?: string;
   firstName?: string;
@@ -63,6 +65,8 @@ export type SessionUserInfo = {
   color?: number;
   isPremium?: boolean;
   emojiStatusId?: string;
+  profileKind?: AccountProfileKind;
+  profileLabel?: string;
 };
 
 export type SharedSessionData = {

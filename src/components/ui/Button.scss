@@ -377,6 +377,24 @@
         right: 0.875rem;
         transform: translateY(-50%);
       }
+
+      &.round {
+        .Spinner {
+          --spinner-size: 1.25rem;
+
+          right: auto;
+          left: 50%;
+          transform: translate(-50%, -50%);
+        }
+      }
+
+      &.round.smaller .Spinner {
+        --spinner-size: 1.125rem;
+      }
+
+      &.round.tiny .Spinner {
+        --spinner-size: 0.875rem;
+      }
     }
 
     .emoji {

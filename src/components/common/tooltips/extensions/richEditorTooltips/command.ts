@@ -8,6 +8,7 @@ import type { ApiBotCommand } from '../../../../../api/types';
 import type { RichEditorTooltipItem, RichEditorTooltipsConfig } from '../../types';
 
 import { getMainUsername } from '../../../../../global/helpers';
+import { isAirQuickReply } from '../../../../../util/airQuickReplies';
 import { replaceEditorRange } from '../../../../middle/composer/helpers/richEditorComposer';
 import {
   buildBlockMatch,
@@ -35,6 +36,10 @@ export function buildCommandSuggestion(
     command: ({ editor: currentEditor, range, props }) => {
       const { sendBotCommand, sendQuickReply } = getActions();
       const context = config.getContext();
+      if (isAirQuickReply(props)) {
+        replaceEditorRange(currentEditor, range, { type: 'text', text: props.content });
+        return;
+      }
       if ('shortcut' in props) {
         replaceEditorRange(currentEditor, range, { type: 'text', text: `/${props.shortcut}` });
         sendQuickReply({ chatId: context.chatId, quickReplyId: props.id });
@@ -68,6 +73,9 @@ function filterCommands(config: RichEditorTooltipsConfig, query: string) {
   const commands = context.botCommands && context.botCommands.length
     ? context.botCommands
     : context.chatBotCommands;
+  const airQuickReplies = (context.airQuickReplies || []).filter((reply) => (
+    !query || reply.shortcut.startsWith(query.toLowerCase())
+  ));
   const quickReplies = context.isCurrentUserPremium
     ? Object.values(context.quickReplies || {}).filter(
       (quickReply) => !query || quickReply.shortcut.startsWith(query),
@@ -77,5 +85,5 @@ function filterCommands(config: RichEditorTooltipsConfig, query: string) {
     (!context.isInScheduledList || !command.isEphemeral)
     && (!query || command.command.startsWith(query))
   )) || [];
-  return [...quickReplies, ...filteredCommands];
+  return [...airQuickReplies, ...quickReplies, ...filteredCommands];
 }

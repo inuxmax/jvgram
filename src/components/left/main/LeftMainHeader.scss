@@ -209,6 +209,17 @@
       font-size: 1em;
       line-height: 1;
     }
+
+    &-kind {
+      overflow: hidden;
+
+      margin-inline-start: 0.375rem;
+
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
 }
 

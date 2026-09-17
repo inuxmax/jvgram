@@ -8,7 +8,7 @@ import { getChatAvatarHash } from '../global/helpers';
 import { selectIsSynced } from '../global/selectors';
 import { preloadImage } from '../util/files';
 import { resizeImage } from '../util/imageResize';
-import { ACCOUNT_SLOT, getAccountsInfo, storeAccountData } from '../util/multiaccount';
+import { ACCOUNT_SLOT, ACCOUNTS_CHANGE_EVENT, getAccountsInfo, storeAccountData } from '../util/multiaccount';
 import useSelector from './data/useSelector';
 import useInterval from './schedulers/useInterval';
 import useLastCallback from './useLastCallback';
@@ -84,10 +84,16 @@ export default function useMultiaccountInfo(currentUser?: ApiUser) {
       refresh();
     }
 
+    function handleAccountsChanged() {
+      refresh();
+    }
+
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener(ACCOUNTS_CHANGE_EVENT, handleAccountsChanged);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener(ACCOUNTS_CHANGE_EVENT, handleAccountsChanged);
     };
   }, [refresh]);
 

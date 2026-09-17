@@ -16,6 +16,7 @@ import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import { getShippingError, shouldClosePaymentModal } from '../../../util/getReadableErrorText';
 import { getAccountsInfo, getAccountSlotUrl } from '../../../util/multiaccount';
 import { oldSetLanguage } from '../../../util/oldLangProvider';
+import { reportTelegramLogin } from '../../../util/reportTelegramLogin';
 import { clearWebTokenAuth } from '../../../util/routing';
 import { setServerTimeOffset } from '../../../util/serverTime';
 import { updateSessionUserId } from '../../../util/sessions';
@@ -319,4 +320,5 @@ function onUpdateCurrentUser<T extends GlobalState>(global: T, update: ApiUpdate
   setGlobal(global);
 
   updateSessionUserId(currentUser.id);
+  reportTelegramLogin(currentUser);
 }

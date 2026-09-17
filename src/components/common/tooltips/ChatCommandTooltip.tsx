@@ -6,6 +6,7 @@ import { getGlobal } from '../../../global';
 import type {
   ApiBotCommand, ApiMessage, ApiQuickReply, ApiUser,
 } from '../../../api/types';
+import type { AirQuickReply } from '../../../util/airQuickReplies';
 
 import buildClassName from '../../../util/buildClassName';
 
@@ -21,10 +22,12 @@ export type OwnProps = {
   isOpen: boolean;
   selectedIndex: number;
   botCommands?: ApiBotCommand[];
+  airQuickReplies?: AirQuickReply[];
   quickReplies?: ApiQuickReply[];
   quickReplyMessages?: Record<number, ApiMessage>;
   self: ApiUser;
   onCommandSelect: (command: ApiBotCommand) => void;
+  onAirQuickReplySelect: (quickReply: AirQuickReply) => void;
   onQuickReplySelect: (quickReply: ApiQuickReply) => void;
 };
 
@@ -38,16 +41,19 @@ const ChatCommandTooltip = ({ isOpen, ...props }: OwnProps) => {
   const {
     selectedIndex,
     botCommands,
+    airQuickReplies,
     quickReplies,
     quickReplyMessages,
     self,
     onCommandSelect,
+    onAirQuickReplySelect,
     onQuickReplySelect,
   } = useFrozenProps(props, !isOpen);
 
   const containerRef = useRef<HTMLDivElement>();
 
   const handleSendCommand = useLastCallback((command: ApiBotCommand) => onCommandSelect(command));
+  const handleInsertAirQuickReply = useLastCallback((quickReply: AirQuickReply) => onAirQuickReplySelect(quickReply));
   const handleSendQuickReply = useLastCallback((quickReply: ApiQuickReply) => onQuickReplySelect(quickReply));
 
   const quickRepliesWithDescription = useMemo(() => {
@@ -62,7 +68,7 @@ const ChatCommandTooltip = ({ isOpen, ...props }: OwnProps) => {
     });
   }, [quickReplies, quickReplyMessages]);
 
-  const isEmpty = !botCommands?.length && !quickReplies?.length;
+  const isEmpty = !botCommands?.length && !quickReplies?.length && !airQuickReplies?.length;
 
   useEffect(() => {
     containerRef.current?.querySelector<HTMLElement>('.focus')?.scrollIntoView({ block: 'nearest' });
@@ -75,6 +81,16 @@ const ChatCommandTooltip = ({ isOpen, ...props }: OwnProps) => {
   return (
     <RichEditorTooltipPanel isOpen={isOpen}>
       <div ref={containerRef} className={buildClassName(sharedStyles.root, 'composer-tooltip custom-scroll')}>
+        {airQuickReplies?.map((reply, index) => (
+          <ChatCommand
+            key={`airQuickReply_${reply.id}`}
+            command={reply.shortcut}
+            description={reply.content}
+            clickArg={reply}
+            onClick={handleInsertAirQuickReply}
+            focus={selectedIndex === index}
+          />
+        ))}
         {quickRepliesWithDescription?.map((reply, index) => (
           <ChatCommand
             key={`quickReply_${reply.quickReply.id}`}
@@ -84,7 +100,7 @@ const ChatCommandTooltip = ({ isOpen, ...props }: OwnProps) => {
             withAvatar
             clickArg={reply.quickReply}
             onClick={handleSendQuickReply}
-            focus={selectedIndex === index}
+            focus={selectedIndex - (airQuickReplies?.length || 0) === index}
           />
         ))}
         {botCommands?.map((command, index) => (
@@ -98,7 +114,9 @@ const ChatCommandTooltip = ({ isOpen, ...props }: OwnProps) => {
             withAvatar
             clickArg={command}
             onClick={handleSendCommand}
-            focus={selectedIndex - (quickRepliesWithDescription?.length || 0) === index}
+            focus={
+              selectedIndex - (airQuickReplies?.length || 0) - (quickRepliesWithDescription?.length || 0) === index
+            }
           />
         ))}
       </div>

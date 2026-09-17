@@ -124,6 +124,8 @@ import {
   selectEditingScheduledDraft,
   selectNoWebPage,
 } from '../../global/selectors/threads';
+import { airQuickReplyStore } from '../../util/airQuickReplies';
+import { AIR_TRANSLATE_TOAST, translatePlainText } from '../../util/airTranslate';
 import {
   IS_IOS, IS_VIDEO_RECORDING_SUPPORTED, IS_VOICE_RECORDING_SUPPORTED,
 } from '../../util/browser/windowEnvironment';
@@ -532,6 +534,11 @@ const Composer = ({
   const { width: windowWidth } = windowSize.get();
   const forceUpdate = useForceUpdate();
 
+  useEffect(() => airQuickReplyStore.subscribe(forceUpdate), [forceUpdate]);
+  useEffect(() => {
+    void airQuickReplyStore.load();
+  }, []);
+
   const isInMessageList = type === 'messageList';
   const isRichInputExpansionActive = Boolean(isInMessageList && isRichInputExpanded);
   const isInStoryViewer = type === 'story';
@@ -547,6 +554,7 @@ const Composer = ({
     openRemoveFormattingModal,
     closeRemoveFormattingModal,
   ] = useFlag();
+  const [isTranslatingComposer, startTranslatingComposer, stopTranslatingComposer] = useFlag();
   const shouldFocusAfterFormattingRemovalRef = useRef(false);
 
   const canMediaBeReplaced = editingMessage && canEditMedia(editingMessage);
@@ -771,6 +779,48 @@ const Composer = ({
     if (isComposerBlocked) return;
 
     richEditor.insertContent({ type: 'text', text });
+  });
+
+  const handleAirTranslateComposer = useLastCallback(() => {
+    if (isComposerBlocked || isTranslatingComposer) {
+      return;
+    }
+
+    const formatted = getRichInputAsFormatted(richEditor.getValue());
+    const text = formatted?.text.trim();
+    if (!text) {
+      showNotification({
+        message: { key: 'AirTranslateEmpty' },
+        containerSelector: AIR_TRANSLATE_TOAST.containerSelector,
+      });
+      return;
+    }
+
+    startTranslatingComposer();
+    void translatePlainText(text)
+      .then((translated) => {
+        if (!translated) {
+          showNotification({
+            message: { key: 'AirTranslateEmpty' },
+            containerSelector: AIR_TRANSLATE_TOAST.containerSelector,
+          });
+          return;
+        }
+
+        const nextValue = buildRichMessageFromFormatted({ text: translated });
+        if (richEditor.isReady) {
+          richEditor.replaceValue(nextValue);
+        } else {
+          updateRichMessage(nextValue);
+        }
+      })
+      .catch(() => {
+        showNotification({
+          message: { key: 'AirTranslateError' },
+          containerSelector: AIR_TRANSLATE_TOAST.containerSelector,
+        });
+      })
+      .finally(stopTranslatingComposer);
   });
 
   const insertFormattedTextAndUpdateCursor = useLastCallback((
@@ -1909,6 +1959,7 @@ const Composer = ({
     botCommands,
     chatBotCommands,
     quickReplies: canSendQuickReplies && isCurrentUserPremium ? quickReplies : undefined,
+    airQuickReplies: airQuickReplyStore.getReplies(),
     quickReplyMessages,
     isSavedMessages: isChatWithSelf,
     isInScheduledList,
@@ -1941,6 +1992,7 @@ const Composer = ({
       (botCommands && botCommands.length)
       || chatBotCommands?.length
       || (hasQuickReplies && canSendQuickReplies && isCurrentUserPremium)
+      || airQuickReplyStore.getReplies().length
     ),
   ));
   const getIsFormatterEnabled = useLastCallback(() => Boolean(
@@ -2933,31 +2985,44 @@ const Composer = ({
             />
           )}
           {((!isComposerBlocked || canSendGifs || canSendStickers) && !isNeedPremium && !isAccountFrozen) && (
-            <SymbolMenuButton
-              chatId={chatId}
-              threadId={threadId}
-              isMobile={isMobile}
-              isReady={isReady}
-              isSymbolMenuOpen={isSymbolMenuOpen}
-              openSymbolMenu={openSymbolMenu}
-              closeSymbolMenu={closeSymbolMenu}
-              canSendStickers={canSendStickers}
-              canSendGifs={canSendGifs}
-              isMessageComposer={isInMessageList}
-              onGifSelect={handleGifSelect}
-              onGifAddCaption={hasRichOnlyContent ? undefined : handleGifAddCaption}
-              onStickerSelect={handleStickerSelect}
-              onCustomEmojiSelect={handleCustomEmojiSelect}
-              onRemoveSymbol={removeSymbol}
-              onEmojiSelect={insertTextAndUpdateCursor}
-              closeBotCommandMenu={closeBotCommandMenu}
-              closeSendAsMenu={closeSendAsMenu}
-              isSymbolMenuForced={isSymbolMenuForced}
-              canSendPlainText={!isComposerBlocked}
-              inputCssSelector={editableInputCssSelector}
-              idPrefix={type}
-              forceDarkTheme={isInStoryViewer}
-            />
+            <>
+              {!isComposerBlocked && !activeRecording && (
+                <Button
+                  round
+                  className="composer-action-button"
+                  color="translucent"
+                  onClick={handleAirTranslateComposer}
+                  ariaLabel={lang('AirTranslateComposer')}
+                  iconName="language"
+                  isLoading={isTranslatingComposer}
+                />
+              )}
+              <SymbolMenuButton
+                chatId={chatId}
+                threadId={threadId}
+                isMobile={isMobile}
+                isReady={isReady}
+                isSymbolMenuOpen={isSymbolMenuOpen}
+                openSymbolMenu={openSymbolMenu}
+                closeSymbolMenu={closeSymbolMenu}
+                canSendStickers={canSendStickers}
+                canSendGifs={canSendGifs}
+                isMessageComposer={isInMessageList}
+                onGifSelect={handleGifSelect}
+                onGifAddCaption={hasRichOnlyContent ? undefined : handleGifAddCaption}
+                onStickerSelect={handleStickerSelect}
+                onCustomEmojiSelect={handleCustomEmojiSelect}
+                onRemoveSymbol={removeSymbol}
+                onEmojiSelect={insertTextAndUpdateCursor}
+                closeBotCommandMenu={closeBotCommandMenu}
+                closeSendAsMenu={closeSendAsMenu}
+                isSymbolMenuForced={isSymbolMenuForced}
+                canSendPlainText={!isComposerBlocked}
+                inputCssSelector={editableInputCssSelector}
+                idPrefix={type}
+                forceDarkTheme={isInStoryViewer}
+              />
+            </>
           )}
           {isInStoryViewer && !activeRecording && (
             <Button

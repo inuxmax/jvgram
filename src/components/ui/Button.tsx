@@ -209,10 +209,18 @@ const Button = ({
 
   const renderContent = () => {
     if (isLoading) {
+      const spinner = (
+        <Spinner color={isText || color.startsWith('translucent') ? 'blue' : 'white'} />
+      );
+
+      if (round) {
+        return spinner;
+      }
+
       return (
         <div>
-          <span dir={isRtl ? 'auto' : undefined}>{lang('Cache.ClearProgress')}</span>
-          <Spinner color={isText ? 'blue' : 'white'} />
+          <span className="loading-label" dir={isRtl ? 'auto' : undefined}>{lang('Cache.ClearProgress')}</span>
+          {spinner}
         </div>
       );
     }
@@ -289,6 +297,7 @@ const Button = ({
       onFileHoverOpen={onFileHoverOpen ? handleFileHoverOpen : undefined}
       disabled={disabled && !allowDisabledClick}
       autoFocus={autoFocus}
+      aria-busy={isLoading || undefined}
       aria-label={ariaLabel}
       aria-controls={ariaControls}
       aria-haspopup={hasPopup}

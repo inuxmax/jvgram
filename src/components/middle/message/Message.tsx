@@ -188,6 +188,7 @@ import { animateSnap } from '../../main/visualEffects/SnapEffectContainer';
 import Button from '../../ui/Button';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import InputText from '../../ui/InputText';
+import AirMessageTranslation from './AirMessageTranslation';
 import Album from './Album';
 import AnimatedCustomEmoji from './AnimatedCustomEmoji';
 import AnimatedEmoji from './AnimatedEmoji';
@@ -1518,6 +1519,7 @@ const Message = ({
             {hasText && !hasAnimatedEmoji && (
               <div className={textContentClass} dir="auto">
                 {renderMessageText()}
+                <AirMessageTranslation chatId={chatId} messageId={textMessage?.id || messageId} text={text?.text} />
                 {isNewTextPending && renderMessageTextAnimation()}
                 {hasFactCheck && (
                   <FactCheck factCheck={factCheck} isToggleDisabled={isInSelectMode} />
@@ -1573,6 +1575,7 @@ const Message = ({
         {hasText && !hasAnimatedEmoji && (
           <div className={textContentClass} dir="auto">
             {renderMessageText()}
+            <AirMessageTranslation chatId={chatId} messageId={textMessage?.id || messageId} text={text?.text} />
             {isNewTextPending && renderMessageTextAnimation()}
             {!hasContentAfterText && isMetaInText && renderReactionsAndMeta()}
           </div>

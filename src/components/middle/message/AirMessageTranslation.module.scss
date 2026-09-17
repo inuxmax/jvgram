@@ -1,0 +1,67 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  align-items: flex-start;
+
+  margin-top: 0.375rem;
+}
+
+.chip {
+  cursor: var(--custom-cursor, pointer);
+
+  display: inline-flex;
+  gap: 0.3125rem;
+  align-items: center;
+
+  margin: 0;
+  padding: 0.1875rem 0.5rem 0.1875rem 0.375rem;
+  border: none;
+  border-radius: 1rem;
+
+  color: var(--accent-color);
+
+  background: var(--hover-color);
+
+  @media (hover: hover) {
+    &:hover:not(.chipBusy) {
+      background: var(--accent-background-color);
+    }
+  }
+}
+
+.chipBusy {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.chipIcon,
+.chipSpinner {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+}
+
+.chipIcon {
+  font-size: 1rem;
+}
+
+.chipSpinner {
+  --spinner-size: 1rem;
+}
+
+.chipLabel {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1rem;
+}
+
+.result {
+  padding-top: 0.25rem;
+  border-top: 0.0625rem solid var(--color-borders);
+
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+}

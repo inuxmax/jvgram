@@ -55,6 +55,7 @@ function getAccountInfo(slot: number): AccountInfo | undefined {
   const sessionData = loadSlotSession(slot);
   const {
     userId, avatarUri, color, emojiStatusId, firstName, lastName, isPremium, isTest, phone,
+    profileKind, profileLabel,
   } = sessionData || {};
 
   if (!userId) return undefined;
@@ -69,6 +70,8 @@ function getAccountInfo(slot: number): AccountInfo | undefined {
     isPremium,
     isTest,
     phone,
+    profileKind,
+    profileLabel,
   };
 }
 
@@ -97,8 +100,16 @@ export function storeAccountData(slot: number | undefined, data: Partial<Session
   writeSlotSession(slot, updatedSharedData);
 }
 
-export function writeSlotSession(slot: number | undefined, data: SharedSessionData) {
+export function writeSlotSession(slot: number | undefined, data: SharedSessionData, noNotify?: true) {
   localStorage.setItem(`${SESSION_ACCOUNT_PREFIX}${slot || 1}`, JSON.stringify(data));
+  if (!noNotify) notifyAccountsChanged();
+}
+
+export const ACCOUNTS_CHANGE_EVENT = 'air-accounts-changed';
+
+export function notifyAccountsChanged() {
+  if (typeof window !== 'object') return;
+  window.dispatchEvent(new Event(ACCOUNTS_CHANGE_EVENT));
 }
 
 export function getAccountSlotUrl(slot: number, forLogin?: boolean, isTest?: boolean) {
@@ -117,6 +128,19 @@ export function getAccountSlotUrl(slot: number, forLogin?: boolean, isTest?: boo
 
   url.hash = forLogin ? 'login' : '';
   return url.toString();
+}
+
+export function getNextFreeAccountSlot(accounts = getAccountsInfo()) {
+  let slot = 1;
+  while (accounts[slot] || loadSlotSession(slot)) {
+    slot += 1;
+  }
+  return slot;
+}
+
+export function getAccountDisplayName(account: AccountInfo) {
+  if (account.profileLabel) return account.profileLabel;
+  return [account.firstName, account.lastName].filter(Boolean).join(' ') || account.phone || '';
 }
 
 // Validate current version across all tabs to avoid conflicts

@@ -35,13 +35,15 @@ const ChatFolderTabList = ({
   });
 
   return (
-    <div className={buildClassName(styles.root)}>
+    <div className={styles.root}>
       <TabList
+        layout="vertical"
+        itemAlignment="vertical"
         tabs={tabs}
         activeTab={activeTab}
-        withFadeMask
         renderExtra={renderExtra}
         className={buildClassName(styles.tabList, className)}
+        tabClassName={styles.tab}
         onSwitchTab={onSwitchTab}
         onFileHoverOpen={onFileHoverOpen}
       />

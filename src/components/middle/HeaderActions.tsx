@@ -1,8 +1,8 @@
 import type { FC } from '../../lib/teact/teact';
 import {
-  memo, useCallback, useMemo, useRef, useState,
+  memo, useCallback, useEffect, useMemo, useRef, useState,
 } from '../../lib/teact/teact';
-import { getActions, withGlobal } from '../../global';
+import { getActions, getGlobal, withGlobal } from '../../global';
 
 import type { IAnchorPosition, MessageListType, ThreadId, TranslationTone } from '../../types';
 import { MAIN_THREAD_ID } from '../../api/types';
@@ -13,6 +13,7 @@ import { requestMeasure, requestNextMutation } from '../../lib/fasterdom/fasterd
 import {
   getHasAdminRight,
   getIsSavedDialog,
+  getMessageText,
   isAnonymousForwardsChat,
   isChatChannel, isChatSuperGroup,
 } from '../../global/helpers';
@@ -23,6 +24,7 @@ import {
   selectChat,
   selectChatFullInfo,
   selectChatHistoryTtl,
+  selectChatMessages,
   selectIsChatRestricted,
   selectIsChatWithSelf,
   selectIsCurrentUserFrozen,
@@ -34,11 +36,14 @@ import {
   selectTranslationLanguage,
   selectUserFullInfo,
 } from '../../global/selectors';
+import { AIR_CHAT_TRANSLATE_BATCH, AIR_TRANSLATE_TOAST, airTranslateStore } from '../../util/airTranslate';
 import { ARE_CALLS_SUPPORTED, IS_APP } from '../../util/browser/windowEnvironment';
 import { formatCountdown } from '../../util/dates/oldDateFormat';
 import { isUserId } from '../../util/entities/ids';
 import focusNoScroll from '../../util/focusNoScroll';
 
+import useFlag from '../../hooks/useFlag';
+import useForceUpdate from '../../hooks/useForceUpdate';
 import { useHotkeys } from '../../hooks/useHotkeys';
 import useLang from '../../hooks/useLang';
 import useLastCallback from '../../hooks/useLastCallback';
@@ -143,6 +148,12 @@ const HeaderActions: FC<OwnProps & StateProps> = ({
   const menuButtonRef = useRef<HTMLButtonElement>();
   const oldLang = useOldLang();
   const lang = useLang();
+  const forceUpdate = useForceUpdate();
+  const [isAirChatBusy, markAirChatBusy, unmarkAirChatBusy] = useFlag();
+
+  useEffect(() => airTranslateStore.subscribe(forceUpdate), [forceUpdate]);
+
+  const isAirChatEnabled = airTranslateStore.isChatEnabled(chatId);
 
   const historyTtlText = historyTtl ? formatCountdown(lang, historyTtl) : undefined;
   const autoDeleteInfoText = historyTtlText
@@ -214,6 +225,52 @@ const HeaderActions: FC<OwnProps & StateProps> = ({
       return;
     }
     requestMasterAndRequestCall({ userId: chatId });
+  });
+
+  const handleAirTranslateChat = useLastCallback(() => {
+    if (isAirChatBusy) {
+      return;
+    }
+
+    if (airTranslateStore.isChatEnabled(chatId)) {
+      airTranslateStore.disableChat(chatId);
+      return;
+    }
+
+    const global = getGlobal();
+    const messages = selectChatMessages(global, chatId);
+    airTranslateStore.enableChat(chatId);
+
+    if (!messages) {
+      return;
+    }
+
+    const recentIds = Object.keys(messages).map(Number).sort((a, b) => a - b).slice(-AIR_CHAT_TRANSLATE_BATCH);
+    const items = recentIds.reduce<{ id: number; text: string }[]>((acc, id) => {
+      const text = getMessageText(messages[id])?.text;
+      if (text) {
+        acc.push({ id, text });
+      }
+      return acc;
+    }, []);
+
+    if (!items.length) {
+      showNotification({
+        message: { key: 'AirTranslateEmpty' },
+        containerSelector: AIR_TRANSLATE_TOAST.containerSelector,
+      });
+      return;
+    }
+
+    markAirChatBusy();
+    void airTranslateStore.translateMany(chatId, items)
+      .catch(() => {
+        showNotification({
+          message: { key: 'AirTranslateError' },
+          containerSelector: AIR_TRANSLATE_TOAST.containerSelector,
+        });
+      })
+      .finally(unmarkAirChatBusy);
   });
 
   const handleHotkeySearchClick = useLastCallback((e: KeyboardEvent) => {
@@ -376,6 +433,17 @@ const HeaderActions: FC<OwnProps & StateProps> = ({
           iconName="timer"
         />
       )}
+      <Button
+        round
+        ripple={isRightColumnShown}
+        color="translucent"
+        size="smaller"
+        className={isAirChatEnabled ? 'active' : undefined}
+        onClick={handleAirTranslateChat}
+        ariaLabel={isAirChatEnabled ? lang('AirTranslateChatOff') : lang('AirTranslateChat')}
+        iconName="language"
+        isLoading={isAirChatBusy}
+      />
       {!isMobile && (
         <>
           {canSearch && (

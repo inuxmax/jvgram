@@ -68,6 +68,8 @@ import StickerSetModal from '../common/StickerSetModal.async';
 import UnreadCount from '../common/UnreadCounter';
 import Wallpaper from '../common/Wallpaper';
 import LeftColumn from '../left/LeftColumn';
+import AccountProfilesModal from '../left/main/AccountProfilesModal';
+import AirTranslateSettingsModal from '../left/main/AirTranslateSettingsModal';
 import MediaViewer from '../mediaViewer/MediaViewer.async';
 import ReactionPicker from '../middle/message/reactions/ReactionPicker.async';
 import MessageListHistoryHandler from '../middle/MessageListHistoryHandler';
@@ -677,6 +679,8 @@ const Main = ({
       <DeleteFolderDialog folder={deleteFolderDialog} />
       <ReactionPicker isOpen={isReactionPickerOpen} />
       <DeleteMessageModal isOpen={isDeleteMessageModalOpen} />
+      <AirTranslateSettingsModal />
+      <AccountProfilesModal />
     </Wallpaper>
   );
 };

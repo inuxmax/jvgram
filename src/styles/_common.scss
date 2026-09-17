@@ -135,6 +135,8 @@
 
 // Used by ChatList and ContactList components
 .chat-list {
+  --chat-selection-transition: 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+
   overflow-x: hidden;
   overflow-y: scroll;
 
@@ -165,6 +167,38 @@
 
   .scroll-container {
     position: relative;
+  }
+
+  .chat-list-indicator {
+    pointer-events: none;
+    will-change: transform;
+
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    right: 0;
+    left: 0;
+
+    height: 4.5rem;
+    border-radius: var(--border-radius-default);
+
+    opacity: 0;
+    background: var(--color-chat-active);
+
+    &.shown {
+      opacity: 1;
+      transition:
+        transform var(--chat-selection-transition),
+        opacity 0.2s ease;
+    }
+  }
+
+  &.topic-list .chat-list-indicator {
+    height: 4.0625rem;
+  }
+
+  body.no-page-transitions & .chat-list-indicator.shown {
+    transition: none;
   }
 
   .no-results {
@@ -213,6 +247,16 @@
   @media (max-width: 600px) {
     padding-right: 0;
     padding-left: 0;
+
+    .chat-list-indicator {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chat-list-indicator.shown {
+      transition: none;
+    }
   }
 }
 

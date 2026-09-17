@@ -2352,6 +2352,41 @@ export interface LangPair {
   'SettingsPerformanceDesc': undefined;
   'SettingsStickersDesc': undefined;
   'SettingsSessionsDesc': undefined;
+  'AirTranslateChat': undefined;
+  'AirTranslateChatOff': undefined;
+  'AirTranslateMessage': undefined;
+  'AirTranslateComposer': undefined;
+  'AirTranslateError': undefined;
+  'AirTranslateEmpty': undefined;
+  'AirTranslatePending': undefined;
+  'MenuTranslate': undefined;
+  'AirTranslateSource': undefined;
+  'AirTranslateTarget': undefined;
+  'AirTranslateProvider': undefined;
+  'AirTranslateAuto': undefined;
+  'AirTranslateSave': undefined;
+  'AirTranslateGoogle': undefined;
+  'AirTranslateMyMemory': undefined;
+  'AirTranslateLibre': undefined;
+  'AirTranslateDeepL': undefined;
+  'AirTranslateNoProvider': undefined;
+  'AirProfilesTitle': undefined;
+  'AirProfilesManage': undefined;
+  'AirProfilesAdd': undefined;
+  'AirProfilesSearch': undefined;
+  'AirProfilesEmpty': undefined;
+  'AirProfilesKindPersonal': undefined;
+  'AirProfilesKindBusiness': undefined;
+  'AirProfilesKindAdmin': undefined;
+  'AirProfilesRename': undefined;
+  'AirProfilesBackup': undefined;
+  'AirProfilesBackupOne': undefined;
+  'AirProfilesRestore': undefined;
+  'AirProfilesBackupWarning': undefined;
+  'AirProfilesCurrent': undefined;
+  'AirProfilesUnlimited': undefined;
+  'AirProfilesInvalidBackup': undefined;
+  'AirProfilesSlotLimit': undefined;
 }
 
 export interface LangPairWithVariables<V = LangVariable> {
@@ -4646,6 +4681,18 @@ export interface LangPairPluralWithVariables<V = LangVariable> {
     'count': V;
   };
   'PollModalAddMoreText': {
+    'count': V;
+  };
+  'AirProfilesBackupDone': {
+    'count': V;
+  };
+  'AirProfilesRestoreDone': {
+    'count': V;
+  };
+  'AirProfilesRestoreSkip': {
+    'count': V;
+  };
+  'AirProfilesMore': {
     'count': V;
   };
 }

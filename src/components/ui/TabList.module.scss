@@ -41,6 +41,19 @@
 
       border-radius: 1.875rem;
     }
+
+    &.column {
+      --tab-radius: 1.25rem;
+
+      overflow-x: hidden;
+      overflow-y: auto;
+      flex-direction: column;
+      align-items: stretch;
+
+      height: 100%;
+      padding-block: 0.25rem;
+      padding-inline: 0.25rem;
+    }
   }
 
   .centered {
@@ -70,6 +83,15 @@
 
     &.stretched {
       width: 100%;
+    }
+
+    &.column {
+      flex-direction: column;
+      align-items: stretch;
+
+      width: 100%;
+      padding-block: 0.25rem;
+      padding-inline: 0.25rem;
     }
   }
 
@@ -104,6 +126,21 @@
     &.stretched {
       flex: 1;
       justify-content: center;
+    }
+  }
+
+  .column {
+    gap: 0.25rem;
+
+    .tab {
+      justify-content: center;
+
+      width: 100%;
+      padding: 0.5rem 0.25rem;
+
+      text-align: center;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
   }
 

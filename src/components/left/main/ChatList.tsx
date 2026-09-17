@@ -1,8 +1,9 @@
-import { memo, useEffect, useMemo, useRef, useState } from '@teact';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from '@teact';
 import { getActions } from '../../../global';
 
 import type { GlobalState } from '../../../global/types';
 import type { FolderEditDispatch } from '../../../hooks/reducers/useFoldersReducer';
+import { MAIN_THREAD_ID } from '../../../api/types';
 import { LeftColumnContent } from '../../../types';
 
 import {
@@ -13,13 +14,16 @@ import {
   CHAT_LIST_SLICE,
   SAVED_FOLDER_ID,
 } from '../../../config';
+import { selectChat, selectCurrentMessageList } from '../../../global/selectors';
 import { IS_APP, IS_MAC_OS } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import { getOrderKey, getPinnedChatsCount } from '../../../util/folderManager';
 import { ARCHIVE_ANIMATION_ID } from './hooks';
 
+import useSelector from '../../../hooks/data/useSelector';
 import usePeerStoriesPolling from '../../../hooks/polling/usePeerStoriesPolling';
 import useTopOverscroll from '../../../hooks/scroll/useTopOverscroll';
+import useAppLayout from '../../../hooks/useAppLayout';
 import { useFolderManagerForOrderedIds } from '../../../hooks/useFolderManager';
 import { useHotkeys } from '../../../hooks/useHotkeys';
 import useInfiniteScroll from '../../../hooks/useInfiniteScroll';
@@ -58,6 +62,19 @@ type OwnProps = {
 const INTERSECTION_THROTTLE = 200;
 const RESERVED_HOTKEYS = new Set(['9', '0']);
 
+function selectChatListChatId(global: GlobalState) {
+  return selectCurrentMessageList(global)?.chatId;
+}
+
+function selectChatListThreadId(global: GlobalState) {
+  return selectCurrentMessageList(global)?.threadId;
+}
+
+function selectIsCurrentChatForum(global: GlobalState) {
+  const chatId = selectCurrentMessageList(global)?.chatId;
+  return Boolean(chatId && selectChat(global, chatId)?.isForum);
+}
+
 const ChatList = ({
   className,
   folderType,
@@ -87,7 +104,13 @@ const ChatList = ({
     openLeftColumnContent,
   } = getActions();
   const containerRef = useRef<HTMLDivElement>();
+  const lastIndicatorTopRef = useRef(0);
   const [panesHeight, setPanesHeight] = useState(0);
+  const [isIndicatorReady, setIsIndicatorReady] = useState(false);
+  const { isMobile } = useAppLayout();
+  const currentChatId = useSelector(selectChatListChatId);
+  const currentThreadId = useSelector(selectChatListThreadId);
+  const isCurrentChatForum = useSelector(selectIsCurrentChatForum);
 
   const isArchived = folderType === 'archived';
   const isAllFolder = folderType === 'all';
@@ -104,6 +127,31 @@ const ChatList = ({
   const chatsHeight = (orderedIds?.length || 0) * CHAT_HEIGHT_PX;
   const archiveHeight = shouldDisplayArchive
     ? archiveSettings?.isMinimized ? ARCHIVE_MINIMIZED_HEIGHT : CHAT_HEIGHT_PX : 0;
+
+  const selectedChatId = currentChatId && !isCurrentChatForum && (
+    isSaved ? currentChatId === currentThreadId : currentThreadId === MAIN_THREAD_ID
+  ) ? currentChatId : undefined;
+  const selectedIndex = selectedChatId && orderedIds ? orderedIds.indexOf(selectedChatId) : -1;
+  const indicatorTop = !isMobile && !noAbsolutePositioning && selectedIndex >= 0
+    ? panesHeight + archiveHeight + selectedIndex * CHAT_HEIGHT_PX
+    : undefined;
+
+  useLayoutEffect(() => {
+    if (indicatorTop === undefined) {
+      setIsIndicatorReady(false);
+      return;
+    }
+
+    lastIndicatorTopRef.current = indicatorTop;
+  }, [indicatorTop]);
+
+  useEffect(() => {
+    if (indicatorTop === undefined) {
+      return;
+    }
+
+    setIsIndicatorReady(true);
+  }, [indicatorTop]);
 
   const {
     orderDiffById, shiftDiff, getAnimationType, onReorderAnimationEnd: onReorderAnimationEnd,
@@ -238,6 +286,17 @@ const ChatList = ({
       onLoadMore={getMore}
       onScroll={onScroll}
     >
+      {!isMobile && !noAbsolutePositioning && Boolean(viewportIds?.length) && (
+        <div
+          key="selection-indicator"
+          className={buildClassName(
+            'chat-list-indicator',
+            indicatorTop !== undefined && isIndicatorReady && 'shown',
+          )}
+          style={`transform: translate3d(0, ${indicatorTop ?? lastIndicatorTopRef.current}px, 0)`}
+          aria-hidden
+        />
+      )}
       {!isSaved && <ChatListPanes key="panes" noBanners={!isAllFolder} onHeightChange={setPanesHeight} />}
       {shouldDisplayArchive && (
         <Archive
