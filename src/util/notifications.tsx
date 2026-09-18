@@ -41,6 +41,7 @@ import { buildCollectionByKey } from './iteratees';
 import { getTranslationFn } from './localization';
 import * as mediaLoader from './mediaLoader';
 import { oldTranslate } from './oldLangProvider';
+import { privacyVault } from './privacyVault';
 import { debounce } from './schedulers';
 import { getServerTime } from './serverTime';
 
@@ -293,6 +294,9 @@ export async function subscribe() {
 }
 
 function checkIfShouldNotify(chat: ApiChat, message: Partial<ApiMessage>) {
+  if (privacyVault.shouldSuppressNotification(privacyVault.getCurrentAccountId(), chat.id)) {
+    return false;
+  }
   const global = getGlobal();
   const notifyDefaults = selectNotifyDefaults(global);
   const notifyException = getChatNotifyException(global, chat);
@@ -332,10 +336,15 @@ function getNotificationContent(chat: ApiChat, message: ApiMessage, reaction?: A
 
   const { isScreenLocked } = global.passcode;
   const isSelf = chat.id === global.currentUserId;
+  const shouldHideHiddenPreview = privacyVault.shouldHideNotificationPreview(
+    privacyVault.getCurrentAccountId(),
+    chat.id,
+  );
 
   let body: string;
   if (
     !isScreenLocked
+    && !shouldHideHiddenPreview
     && getShouldShowMessagePreview(chat, selectNotifyDefaults(global), getChatNotifyException(global, chat))
   ) {
     const senderName = sender ? getMessageSenderName(getTranslationFn(), chat.id, sender) : undefined;
@@ -351,7 +360,7 @@ function getNotificationContent(chat: ApiChat, message: ApiMessage, reaction?: A
     body = getTranslationFn()('NotificationMessageTextHidden');
   }
 
-  let title = isScreenLocked ? APP_NAME : getChatTitle(oldTranslate, chat, isSelf);
+  let title = isScreenLocked || shouldHideHiddenPreview ? APP_NAME : getChatTitle(oldTranslate, chat, isSelf);
 
   if (message.isSilent) {
     title += ' 🔕';

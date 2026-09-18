@@ -8,12 +8,15 @@ import type {
 } from '../../../api/types';
 import type { AirQuickReply } from '../../../util/airQuickReplies';
 
+import { airQuickReplyStore } from '../../../util/airQuickReplies';
 import buildClassName from '../../../util/buildClassName';
 
 import useFrozenProps from '../../../hooks/useFrozenProps';
+import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 
 import ChatCommand from '../../middle/composer/ChatCommand';
+import Button from '../../ui/Button';
 import RichEditorTooltipPanel from './RichEditorTooltipPanel';
 
 import sharedStyles from './RichEditorTooltip.module.scss';
@@ -50,11 +53,15 @@ const ChatCommandTooltip = ({ isOpen, ...props }: OwnProps) => {
     onQuickReplySelect,
   } = useFrozenProps(props, !isOpen);
 
+  const lang = useLang();
   const containerRef = useRef<HTMLDivElement>();
 
   const handleSendCommand = useLastCallback((command: ApiBotCommand) => onCommandSelect(command));
   const handleInsertAirQuickReply = useLastCallback((quickReply: AirQuickReply) => onAirQuickReplySelect(quickReply));
   const handleSendQuickReply = useLastCallback((quickReply: ApiQuickReply) => onQuickReplySelect(quickReply));
+  const handleOpenSettings = useLastCallback(() => {
+    airQuickReplyStore.openSettings();
+  });
 
   const quickRepliesWithDescription = useMemo(() => {
     if (!quickReplies?.length || !quickReplyMessages) return undefined;
@@ -81,6 +88,19 @@ const ChatCommandTooltip = ({ isOpen, ...props }: OwnProps) => {
   return (
     <RichEditorTooltipPanel isOpen={isOpen}>
       <div ref={containerRef} className={buildClassName(sharedStyles.root, 'composer-tooltip custom-scroll')}>
+        <div className={sharedStyles.quickReplyHeader}>
+          <span className={sharedStyles.quickReplyTitle}>{lang('AirQuickReplyTitle')}</span>
+          <Button
+            round
+            size="tiny"
+            color="translucent"
+            className={sharedStyles.quickReplySettings}
+            ariaLabel={lang('AirQuickReplySettings')}
+            iconName="settings"
+            shouldStopPropagation
+            onClick={handleOpenSettings}
+          />
+        </div>
         {airQuickReplies?.map((reply, index) => (
           <ChatCommand
             key={`airQuickReply_${reply.id}`}

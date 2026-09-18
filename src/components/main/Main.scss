@@ -1,3 +1,11 @@
+.telegramWorkspace {
+  display: contents;
+}
+
+.telegramWorkspaceHidden {
+  display: none;
+}
+
 #Main {
   isolation: isolate;
   position: relative;

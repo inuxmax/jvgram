@@ -25,8 +25,10 @@ import { selectTabState, selectTheme, selectUser } from '../../../global/selecto
 import { selectSharedSettings } from '../../../global/selectors/sharedState';
 import { airTranslateStore } from '../../../util/airTranslate';
 import { IS_MULTIACCOUNT_SUPPORTED, IS_TAURI } from '../../../util/browser/globalEnvironment';
+import { chatHubStore } from '../../../util/chatHub';
 import { getPromptInstall } from '../../../util/installPrompt';
 import { switchPermanentWebVersion } from '../../../util/permanentWebVersion';
+import { privacyVault } from '../../../util/privacyVault';
 import { getSystemTheme } from '../../../util/systemTheme';
 
 import { useFolderManagerForUnreadCounters } from '../../../hooks/useFolderManager';
@@ -205,6 +207,18 @@ const LeftSideMenuItems = ({
         onClick={handleSelectTranslate}
       >
         {lang('MenuTranslate')}
+      </MenuItem>
+      <MenuItem
+        icon="lock"
+        onClick={() => privacyVault.openVault()}
+      >
+        {lang('AirHiddenVault')}
+      </MenuItem>
+      <MenuItem
+        icon="forums"
+        onClick={() => chatHubStore.openChatHub()}
+      >
+        {lang('ChatHubOpen')}
       </MenuItem>
       <NestedMenuItem
         icon="more"

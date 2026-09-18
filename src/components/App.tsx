@@ -18,6 +18,7 @@ import buildClassName from '../util/buildClassName';
 import { setupBeforeInstallPrompt } from '../util/installPrompt';
 import { ACCOUNT_SLOT, getAccountSlotUrl, getFirstLoggedInAccountSlot } from '../util/multiaccount';
 import { hasEncryptedSession } from '../util/passcode';
+import { priorityGoldStore } from '../util/priorityGold';
 import { getInitialLocationHash, parseInitialLocationHash } from '../util/routing';
 import { checkSessionLocked, hasStoredSession } from '../util/sessions';
 import { getActionMessageBg, getWallpaperBaseColor } from '../util/wallpaper';
@@ -84,6 +85,10 @@ const App = ({
     if (IS_INSTALL_PROMPT_SUPPORTED) {
       setupBeforeInstallPrompt();
     }
+  }, []);
+
+  useEffect(() => {
+    return priorityGoldStore.init();
   }, []);
 
   useEffect(() => {

@@ -1,0 +1,48 @@
+.root {
+  :global(.modal-dialog) {
+    max-width: 26rem;
+  }
+
+  :global(.modal-content) {
+    display: flex;
+    flex-direction: column;
+    max-height: min(80vh, 40rem);
+    padding-bottom: 0.25rem;
+  }
+
+  :global(.input-group) {
+    margin-bottom: 0.75rem;
+  }
+}
+
+.hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-text-secondary);
+}
+
+.empty {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.list {
+  overflow-y: auto;
+  max-height: 12rem;
+  margin: 0 -0.5rem 0.75rem;
+}
+
+.item {
+  :global(.title) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

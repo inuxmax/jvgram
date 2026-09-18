@@ -366,6 +366,7 @@ const SENDING_ANIMATION_DURATION = 350;
 const MOUNT_ANIMATION_DURATION = 430;
 const PAID_STARS_CLOSE_DURATION = 300;
 const APPROXIMATE_RICH_INPUT_FORMAT_OPTIONS = { isApproximate: true };
+const QUICK_REPLY_INPUT_RE = /^\/[\w@]{0,32}$/i;
 
 const Composer = ({
   type,
@@ -1711,6 +1712,25 @@ const Composer = ({
     openBotCommandMenu();
   });
 
+  const handleOpenQuickReplies = useLastCallback(() => {
+    if (isComposerBlocked) return;
+    closeSymbolMenu();
+    if (!airQuickReplyStore.getReplies().length) {
+      airQuickReplyStore.openSettings();
+      return;
+    }
+    const formatted = getRichInputAsFormatted(richEditor.getValue());
+    const text = formatted?.text.trim() || '';
+    if (!text) {
+      insertTextAndUpdateCursor('/');
+      return;
+    }
+    if (QUICK_REPLY_INPUT_RE.test(text)) {
+      return;
+    }
+    airQuickReplyStore.openSettings();
+  });
+
   const handleMessageSchedule = useLastCallback((
     args: ScheduledMessageArgs,
     scheduledAt: number,
@@ -2987,15 +3007,25 @@ const Composer = ({
           {((!isComposerBlocked || canSendGifs || canSendStickers) && !isNeedPremium && !isAccountFrozen) && (
             <>
               {!isComposerBlocked && !activeRecording && (
-                <Button
-                  round
-                  className="composer-action-button"
-                  color="translucent"
-                  onClick={handleAirTranslateComposer}
-                  ariaLabel={lang('AirTranslateComposer')}
-                  iconName="language"
-                  isLoading={isTranslatingComposer}
-                />
+                <>
+                  <Button
+                    round
+                    className="composer-action-button"
+                    color="translucent"
+                    onClick={handleAirTranslateComposer}
+                    ariaLabel={lang('AirTranslateComposer')}
+                    iconName="language"
+                    isLoading={isTranslatingComposer}
+                  />
+                  <Button
+                    round
+                    className="composer-action-button"
+                    color="translucent"
+                    onClick={handleOpenQuickReplies}
+                    ariaLabel={lang('AirQuickReplyOpen')}
+                    iconName="bot-command"
+                  />
+                </>
               )}
               <SymbolMenuButton
                 chatId={chatId}

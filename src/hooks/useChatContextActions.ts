@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from '../lib/teact/teact';
-import { getActions } from '../global';
+import { getActions, getGlobal } from '../global';
 
 import type { MenuItemContextAction } from '../components/ui/ListItem';
 import type { GlobalState } from '../global/types';
@@ -9,14 +9,17 @@ import { ARCHIVED_FOLDER_ID, SERVICE_NOTIFICATIONS_USER_ID } from '../config';
 import {
   getCanDeleteChat, isChatArchived, isChatChannel, isChatCommunity, isChatGroup,
 } from '../global/helpers';
-import { selectChat, selectIsChatPinned } from '../global/selectors';
+import { selectChat, selectCurrentMessageList, selectIsChatPinned } from '../global/selectors';
 import { selectThreadReadState } from '../global/selectors/threads';
 import { IS_TAURI } from '../util/browser/globalEnvironment';
 import { IS_OPEN_IN_NEW_TAB_SUPPORTED } from '../util/browser/windowEnvironment';
 import { isUserId } from '../util/entities/ids';
 import { buildCollectionByCallback, compact } from '../util/iteratees';
+import { ACCOUNT_SLOT } from '../util/multiaccount';
+import { privacyVault } from '../util/privacyVault';
 import useSelector, { useShallowSelector } from './data/useSelector';
 import useLang from './useLang';
+import { usePrivacyRevision } from './usePrivacyVault';
 
 const useChatContextActions = ({
   chat,
@@ -61,9 +64,12 @@ const useChatContextActions = ({
     markChatUnread,
     openChatInNewTab,
     openQuickPreview,
+    openChat,
   } = getActions();
 
   const lang = useLang();
+  const privacyRevision = usePrivacyRevision();
+  const accountId = String(ACCOUNT_SLOT || 1);
 
   const { isSelf } = user || {};
   const isServiceNotifications = user?.id === SERVICE_NOTIFICATIONS_USER_ID;
@@ -117,6 +123,7 @@ const useChatContextActions = ({
   }, [chat, isSavedDialog, lang]);
 
   const preparedActions = useMemo(() => {
+    void privacyRevision;
     if (!chat || isPreview) {
       return undefined;
     }
@@ -192,6 +199,33 @@ const useChatContextActions = ({
         handler: handleMute,
       };
 
+    const isChatCurrentlyHidden = privacyVault.isChatHidden(accountId, chat.id);
+    const actionHide: MenuItemContextAction | undefined = isServiceNotifications ? undefined : (
+      isChatCurrentlyHidden
+        ? {
+          title: lang('AirHiddenUnhideChat'),
+          icon: 'eye',
+          handler: () => {
+            if (privacyVault.hasPin() && !privacyVault.isVaultUnlocked()) {
+              privacyVault.openVault();
+              return;
+            }
+            void privacyVault.unhideChat(accountId, chat.id);
+          },
+        }
+        : {
+          title: lang('AirHiddenHideChat'),
+          icon: 'lock',
+          handler: () => {
+            const chatId = chat.id;
+            void privacyVault.hideChat(accountId, chatId);
+            if (selectCurrentMessageList(getGlobal())?.chatId === chatId) {
+              openChat({ id: undefined });
+            }
+          },
+        }
+    );
+
     // A community has no message history, so most chat actions do not apply
     if (isChatCommunity(chat)) {
       return compact([actionPin, actionMute]);
@@ -199,7 +233,7 @@ const useChatContextActions = ({
 
     if (isInSearch) {
       return compact([
-        actionOpenInNewTab, actionQuickPreview, actionPin, actionAddToFolder, actionMute,
+        actionOpenInNewTab, actionQuickPreview, actionPin, actionAddToFolder, actionMute, actionHide,
       ]);
     }
 
@@ -244,6 +278,7 @@ const useChatContextActions = ({
       canManageListPlacement && actionPin,
       !isSelf && actionMute,
       !isSelf && !isServiceNotifications && !isInFolder && canManageListPlacement && actionArchive,
+      !isServiceNotifications && actionHide,
       actionReport,
       actionDelete,
     ]);
@@ -251,7 +286,7 @@ const useChatContextActions = ({
     chat, isPreview, lang, isSavedDialog, isResolvedPinned, deleteTitle, handleDelete, canChangeFolder,
     handleChatFolderChange, isMuted, handleUnmute, handleMute, isInSearch, chatReadState, topicsReadStates,
     handleReport, user, folderId, isSelf, isServiceNotifications, currentUserId, isInCommunityPanel,
-    isLinkedCommunityCollapsed,
+    isLinkedCommunityCollapsed, accountId, privacyRevision, openChat,
   ]);
 
   return preparedActions;

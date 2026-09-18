@@ -19,6 +19,7 @@ import { getSenderName } from './helpers/getSenderName';
 
 import { useIntersectionObserver } from '../../../hooks/useIntersectionObserver';
 import useOldLang from '../../../hooks/useOldLang';
+import { useVisibleSearchResultKeys } from '../../../hooks/usePrivacyVault';
 import useAsyncRendering from '../../right/hooks/useAsyncRendering';
 
 import Document from '../../common/Document';
@@ -43,7 +44,7 @@ const FileResults: FC<OwnProps & StateProps> = ({
   chatsById,
   usersById,
   globalMessagesByChatId,
-  foundIds,
+  foundIds: rawFoundIds,
   activeDownloads,
   shouldWarnAboutFiles,
 }) => {
@@ -51,6 +52,7 @@ const FileResults: FC<OwnProps & StateProps> = ({
     searchMessagesGlobal,
     focusMessage,
   } = getActions();
+  const foundIds = useVisibleSearchResultKeys(rawFoundIds);
 
   const containerRef = useRef<HTMLDivElement>();
 

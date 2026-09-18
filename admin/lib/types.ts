@@ -56,3 +56,7 @@ export type QuickReplyRecord = {
   attachments: string[];
   createdAt: string;
 };
+
+export type FeatureFlags = {
+  priorityGoldTheme: boolean;
+};

@@ -6,6 +6,8 @@ import { getActions, withGlobal } from '../../../global';
 
 import { throttle } from '../../../util/schedulers';
 
+import { useVisiblePeerIds } from '../../../hooks/usePrivacyVault';
+
 import ListTopPeers from '../../common/ListTopPeers';
 import Island from '../../gili/layout/Island';
 import RecentContactsList from './RecentContactsList';
@@ -35,6 +37,9 @@ const RecentContacts = ({
     addRecentlyFoundChatId, clearRecentlyFoundChats,
   } = getActions();
 
+  const visibleTopPeerIds = useVisiblePeerIds(topPeerIds);
+  const visibleRecentChatIds = useVisiblePeerIds(recentlyFoundChatIds);
+
   // Due to the parent Transition, this component never gets unmounted,
   // that's why we use throttled API call on every update.
   useEffect(() => {
@@ -57,14 +62,14 @@ const RecentContacts = ({
 
   return (
     <div className="RecentContacts custom-scroll">
-      {topPeerIds?.length ? (
+      {visibleTopPeerIds?.length ? (
         <Island className="search-island island-recent-contacts">
-          <ListTopPeers peerIds={topPeerIds} onPeerClick={handleClick} />
+          <ListTopPeers peerIds={visibleTopPeerIds} onPeerClick={handleClick} />
         </Island>
       ) : undefined}
-      {recentlyFoundChatIds && (
+      {visibleRecentChatIds && (
         <RecentContactsList
-          chatIds={recentlyFoundChatIds}
+          chatIds={visibleRecentChatIds}
           noTopBorder={!topPeerIds?.length}
           onChatClick={handleClick}
           onClear={handleClearRecentlyFoundChats}

@@ -67,3 +67,4 @@ class IdbStore {
 
 export const MAIN_IDB_STORE = new IdbStore('tt-data');
 export const PASSCODE_IDB_STORE = new IdbStore('tt-passcode');
+export const PRIVACY_IDB_STORE = new IdbStore('tt-privacy-vault');

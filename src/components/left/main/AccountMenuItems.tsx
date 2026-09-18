@@ -9,15 +9,18 @@ import { temporarilySuspendCacheUpdate } from '../../../global/cache';
 import { openAccountProfiles } from '../../../util/accountProfilesUi';
 import { IS_SAFARI } from '../../../util/browser/windowEnvironment';
 import {
+  ACCOUNT_SLOT,
   getAccountDisplayName,
   getAccountSlotUrl,
   getNextFreeAccountSlot,
 } from '../../../util/multiaccount';
+import { privacyVault } from '../../../util/privacyVault';
 import { REM } from '../../common/helpers/mediaDimensions';
 
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useMultiaccountInfo from '../../../hooks/useMultiaccountInfo';
+import { usePrivacyRevision } from '../../../hooks/usePrivacyVault';
 
 import Avatar from '../../common/Avatar';
 import FullNameTitle from '../../common/FullNameTitle';
@@ -45,20 +48,28 @@ const AccountMenuItems = ({
   const { showNotification } = getActions();
   const lang = useLang();
   const accounts = useMultiaccountInfo(currentUser);
+  const privacyRevision = usePrivacyRevision();
+  const currentSlot = ACCOUNT_SLOT || 1;
 
   const currentAccountInfo = useMemo(() => {
     return Object.values(accounts).find((account) => account.userId === currentUser.id);
   }, [accounts, currentUser.id]);
 
-  const accountEntries = useMemo(() => (
-    Object.entries(accounts)
+  const accountEntries = useMemo(() => {
+    void privacyRevision;
+    return Object.entries(accounts)
       .map(([slot, account]) => ({ slot: Number(slot), account }))
+      .filter(({ slot, account }) => {
+        const isCurrent = account.userId === currentUser.id || slot === currentSlot;
+        if (!privacyVault.isAccountHidden(String(slot))) return true;
+        return isCurrent && privacyVault.isVaultUnlocked();
+      })
       .sort((a, b) => {
         if (a.account.userId === currentUser.id) return -1;
         if (b.account.userId === currentUser.id) return 1;
         return a.slot - b.slot;
-      })
-  ), [accounts, currentUser.id]);
+      });
+  }, [accounts, currentUser.id, currentSlot, privacyRevision]);
 
   const visibleAccounts = accountEntries.length > MENU_ACCOUNT_CAP
     ? accountEntries.slice(0, MENU_ACCOUNT_CAP)
@@ -94,6 +105,31 @@ const AccountMenuItems = ({
 
   const handleManageClick = useLastCallback(() => {
     openAccountProfiles();
+  });
+
+  const handleHideCurrent = useLastCallback(() => {
+    const slotId = String(currentSlot);
+    if (privacyVault.isAccountHidden(slotId)) {
+      if (privacyVault.hasPin() && !privacyVault.isVaultUnlocked()) {
+        privacyVault.openVault();
+        return;
+      }
+      void privacyVault.unhideAccount(slotId);
+      return;
+    }
+
+    void privacyVault.hideAccount(slotId).then(() => {
+      const visible = Object.entries(accounts)
+        .map(([slot]) => Number(slot))
+        .filter((slot) => !privacyVault.isAccountHidden(String(slot)));
+      privacyVault.lockVault();
+      if (visible.length) {
+        const target = accounts[visible[0]];
+        window.location.href = getAccountSlotUrl(visible[0], undefined, target.isTest);
+        return;
+      }
+      privacyVault.openVault();
+    });
   });
 
   return (
@@ -151,6 +187,11 @@ const AccountMenuItems = ({
       )}
       <MenuItem icon="settings" onClick={handleManageClick}>
         {lang('AirProfilesManage')}
+      </MenuItem>
+      <MenuItem icon="lock" onClick={handleHideCurrent}>
+        {privacyVault.isAccountHidden(String(currentSlot))
+          ? lang('AirHiddenUnhideAccount')
+          : lang('AirHiddenHideAccount')}
       </MenuItem>
     </>
   );

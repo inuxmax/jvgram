@@ -2,7 +2,7 @@ import '../../global/actions/all';
 
 import {
   beginHeavyAnimation,
-  memo, onFullyIdle, useEffect, useLayoutEffect,
+  memo, onFullyIdle, useEffect, useLayoutEffect, useMemo,
   useRef, useState,
 } from '../../lib/teact/teact';
 import { addExtraClass, setExtraStyles } from '../../lib/teact/teact-dom';
@@ -38,6 +38,7 @@ import buildClassName from '../../util/buildClassName';
 import { waitForTransitionEnd } from '../../util/cssAnimationEndListeners';
 import { processDeepLink } from '../../util/deeplink';
 import { Bundles, loadBundle } from '../../util/moduleLoader';
+import { privacyVault } from '../../util/privacyVault';
 import { parseInitialLocationHash, parseLocationHash } from '../../util/routing';
 import updateIcon from '../../util/updateIcon';
 import { REM } from '../common/helpers/mediaDimensions';
@@ -47,7 +48,9 @@ import useInterval from '../../hooks/schedulers/useInterval';
 import useTimeout from '../../hooks/schedulers/useTimeout';
 import useTauriEvent from '../../hooks/tauri/useTauriEvent';
 import useAppLayout from '../../hooks/useAppLayout';
+import { useChatHubWorkspace } from '../../hooks/useChatHub';
 import useForceUpdate from '../../hooks/useForceUpdate';
+import { useHotkeys } from '../../hooks/useHotkeys';
 import useLang from '../../hooks/useLang';
 import useLastCallback from '../../hooks/useLastCallback';
 import usePreventPinchZoomGesture from '../../hooks/usePreventPinchZoomGesture';
@@ -58,6 +61,7 @@ import useBeforeUnload from '../../hooks/window/useBeforeUnload';
 import { useFullscreenStatus } from '../../hooks/window/useFullscreen';
 import { PANE_GAP_REM, type PaneState } from '../middle/hooks/useHeaderPane';
 
+import ChatHub from '../../workspaces/chathub/ChatHub';
 import ActiveCallHeader from '../calls/ActiveCallHeader.async';
 import GroupCall from '../calls/group/GroupCall.async';
 import PhoneCall from '../calls/phone/PhoneCall.async';
@@ -70,7 +74,9 @@ import Wallpaper from '../common/Wallpaper';
 import LeftColumn from '../left/LeftColumn';
 import AccountProfilesModal from '../left/main/AccountProfilesModal';
 import AirTranslateSettingsModal from '../left/main/AirTranslateSettingsModal';
+import PrivacyVaultModal from '../left/privacy/PrivacyVaultModal';
 import MediaViewer from '../mediaViewer/MediaViewer.async';
+import AirQuickReplySettingsModal from '../middle/composer/AirQuickReplySettingsModal';
 import ReactionPicker from '../middle/message/reactions/ReactionPicker.async';
 import MessageListHistoryHandler from '../middle/MessageListHistoryHandler';
 import MiddleColumn from '../middle/MiddleColumn';
@@ -279,6 +285,19 @@ const Main = ({
   }
 
   const lang = useLang();
+  const { workspace, settings, toggleWorkspace } = useChatHubWorkspace();
+  const isChatHubOpen = workspace === 'chathub';
+
+  useHotkeys(useMemo(() => ({
+    [settings.hotkey]: (e: KeyboardEvent) => {
+      e.preventDefault();
+      toggleWorkspace();
+    },
+  }), [settings.hotkey, toggleWorkspace]));
+
+  useEffect(() => {
+    void privacyVault.init();
+  }, []);
 
   // Preload Calls bundle to initialize sounds for iOS
   useTimeout(() => {
@@ -620,14 +639,20 @@ const Main = ({
       {IS_TAURI && IS_MAC_OS && (
         <div className="tauri-drag-region" data-tauri-drag-region />
       )}
-      <FoldersSidebar isMobile={isMobile} isActive={isFoldersSidebarShown} />
-      <LeftColumn ref={leftColumnRef} isFoldersSidebarShown={isFoldersSidebarShown} />
-      <MiddleColumn
-        leftColumnRef={leftColumnRef}
-        isMobile={isMobile}
-        onPlayerPaneStateChange={handlePlayerPaneStateChange}
-      />
-      <RightColumn isMobile={isMobile} />
+      <div
+        className={buildClassName('telegramWorkspace', isChatHubOpen && 'telegramWorkspaceHidden')}
+        aria-hidden={isChatHubOpen}
+      >
+        <FoldersSidebar isMobile={isMobile} isActive={isFoldersSidebarShown} />
+        <LeftColumn ref={leftColumnRef} isFoldersSidebarShown={isFoldersSidebarShown} />
+        <MiddleColumn
+          leftColumnRef={leftColumnRef}
+          isMobile={isMobile}
+          onPlayerPaneStateChange={handlePlayerPaneStateChange}
+        />
+        <RightColumn isMobile={isMobile} />
+      </div>
+      {isChatHubOpen && <ChatHub />}
       <MediaViewer isOpen={isMediaViewerOpen} />
       <StoryViewer isOpen={isStoryViewerOpen} />
       <ForwardRecipientPicker isOpen={isForwardModalOpen} />
@@ -680,7 +705,9 @@ const Main = ({
       <ReactionPicker isOpen={isReactionPickerOpen} />
       <DeleteMessageModal isOpen={isDeleteMessageModalOpen} />
       <AirTranslateSettingsModal />
+      <AirQuickReplySettingsModal />
       <AccountProfilesModal />
+      <PrivacyVaultModal />
     </Wallpaper>
   );
 };

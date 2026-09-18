@@ -19,6 +19,7 @@ import { getOrderedIds } from '../../../util/folderManager';
 import { unique } from '../../../util/iteratees';
 import { parseSearchResultKey, type SearchResultKey } from '../../../util/keys/searchResultKey';
 import { MEMO_EMPTY_ARRAY } from '../../../util/memo';
+import { privacyVault } from '../../../util/privacyVault';
 import { throttle } from '../../../util/schedulers';
 import { renderMessageSummary } from '../../common/helpers/renderMessageText';
 import sortChatIds from '../../common/helpers/sortChatIds';
@@ -30,6 +31,7 @@ import useHorizontalScroll from '../../../hooks/useHorizontalScroll';
 import { useIntersectionObserver } from '../../../hooks/useIntersectionObserver';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
+import { usePrivacyRevision, useVisiblePeerIds, useVisibleSearchResultKeys } from '../../../hooks/usePrivacyVault';
 
 import Icon from '../../common/icons/Icon';
 import NothingFound from '../../common/NothingFound';
@@ -102,6 +104,10 @@ const ChatResults: FC<OwnProps & StateProps> = ({
   const chatSelectionRef = useRef<HTMLDivElement>();
 
   const lang = useLang();
+  const privacyRevision = usePrivacyRevision();
+  const visibleAccountPeerIds = useVisiblePeerIds(accountPeerIds);
+  const visibleGlobalPeerIds = useVisiblePeerIds(globalPeerIds);
+  const visibleFoundIds = useVisibleSearchResultKeys(foundIds);
 
   const { isMobile } = useAppLayout();
   const [shouldShowMoreLocal, setShouldShowMoreLocal] = useState<boolean>(false);
@@ -224,8 +230,9 @@ const ChatResults: FC<OwnProps & StateProps> = ({
 
     // No need for expensive global updates, so we avoid them
     const chatsById = getGlobal().chats.byId;
+    void privacyRevision;
 
-    const orderedChatIds = getOrderedIds(ALL_FOLDER_ID) ?? [];
+    const orderedChatIds = privacyVault.filterHiddenPeerIds(getOrderedIds(ALL_FOLDER_ID) ?? []) ?? [];
     const filteredChatIds = orderedChatIds.filter((id) => {
       if (!isChannelList) return true;
       const chat = chatsById[id];
@@ -240,9 +247,9 @@ const ChatResults: FC<OwnProps & StateProps> = ({
       ...(contactIds || []),
     ];
 
-    const localContactIds = filterPeersByQuery({
+    const localContactIds = privacyVault.filterHiddenPeerIds(filterPeersByQuery({
       ids: contactIdsWithMe, query: searchQuery, type: 'user',
-    });
+    })) ?? [];
 
     const localPeerIds = [
       ...localContactIds,
@@ -251,38 +258,38 @@ const ChatResults: FC<OwnProps & StateProps> = ({
 
     return unique([
       ...sortChatIds(localPeerIds, undefined, currentUserId ? [currentUserId] : undefined),
-      ...sortChatIds(accountPeerIds || []),
+      ...sortChatIds(visibleAccountPeerIds || []),
     ]);
-  }, [searchQuery, currentUserId, contactIds, accountPeerIds, isChannelList]);
+  }, [searchQuery, currentUserId, contactIds, visibleAccountPeerIds, isChannelList, privacyRevision]);
 
   useHorizontalScroll(chatSelectionRef, !localResults.length || isChannelList, true);
 
   const globalResults = useMemo(() => {
-    if (!searchQuery || searchQuery.length < MIN_QUERY_LENGTH_FOR_GLOBAL_SEARCH || !globalPeerIds) {
+    if (!searchQuery || searchQuery.length < MIN_QUERY_LENGTH_FOR_GLOBAL_SEARCH || !visibleGlobalPeerIds) {
       return MEMO_EMPTY_ARRAY;
     }
 
     // No need for expensive global updates, so we avoid them
     const chatsById = getGlobal().chats.byId;
 
-    const filteredIds = globalPeerIds.filter((id) => {
+    const filteredIds = visibleGlobalPeerIds.filter((id) => {
       if (!isChannelList) return true;
       const chat = chatsById[id];
       return chat && isChatChannel(chat);
     });
 
     return sortChatIds(filteredIds, true);
-  }, [globalPeerIds, isChannelList, searchQuery]);
+  }, [visibleGlobalPeerIds, isChannelList, searchQuery]);
 
   const foundMessages = useMemo(() => {
-    if ((!searchQuery && !searchDate) || !foundIds || foundIds.length === 0) {
+    if ((!searchQuery && !searchDate) || !visibleFoundIds || visibleFoundIds.length === 0) {
       return MEMO_EMPTY_ARRAY;
     }
 
     // No need for expensive global updates, so we avoid them
     const chatsById = getGlobal().chats.byId;
 
-    return foundIds
+    return visibleFoundIds
       .map((id) => {
         const [chatId, messageId] = parseSearchResultKey(id);
         const chat = chatsById[chatId];
@@ -292,7 +299,7 @@ const ChatResults: FC<OwnProps & StateProps> = ({
         return globalMessagesByChatId?.[chatId]?.byId[messageId];
       })
       .filter(Boolean);
-  }, [searchQuery, searchDate, foundIds, isChannelList, globalMessagesByChatId]);
+  }, [searchQuery, searchDate, visibleFoundIds, isChannelList, globalMessagesByChatId]);
 
   useEffect(() => {
     if (!searchQuery) return;

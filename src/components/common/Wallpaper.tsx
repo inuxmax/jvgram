@@ -8,6 +8,7 @@ import buildClassName from '../../util/buildClassName';
 import buildStyle from '../../util/buildStyle';
 
 import useChatBackground from '../../hooks/useChatBackground';
+import usePriorityGold from '../../hooks/usePriorityGold';
 
 import backgroundStyles from '../../styles/_patternBackground.module.scss';
 
@@ -52,6 +53,7 @@ const Wallpaper = ({
   // With the send animation disabled the gradient never moves, so the 2D render is identical
   // and no WebGL context is spent
   const isStaticGradient = isStatic || !canAnimateGradient;
+  const { activeSkin } = usePriorityGold();
 
   const background = useChatBackground({
     theme,
@@ -77,6 +79,9 @@ const Wallpaper = ({
             ref={background.gradientCanvasRef}
             className={backgroundStyles.gradientCanvas}
           />
+        )}
+        {activeSkin === 'priority-gold' && (
+          <div className={backgroundStyles.goldWallpaper} />
         )}
       </div>
       {children}

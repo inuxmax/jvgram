@@ -42,6 +42,10 @@ export default async function DashboardPage() {
           <h2 className="card-title">Lối tắt</h2>
           <p className="page-sub">Mở nhanh các trang dùng nhiều nhất.</p>
           <div className="quick-links">
+            <Link className="quick-link" href="/features">
+              <strong>Giao diện</strong>
+              <span>Bật hoặc tắt theme Priority Gold</span>
+            </Link>
             <Link className="quick-link" href="/translate">
               <strong>Dịch</strong>
               <span>Nhà cung cấp và ngôn ngữ mặc định</span>

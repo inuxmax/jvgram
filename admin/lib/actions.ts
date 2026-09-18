@@ -17,6 +17,7 @@ import {
   removeUpgrade,
   removeUsername,
   saveAiSettings,
+  saveFeatureFlags,
   saveTranslateSettings,
   setUpgradeActive,
   verifyAdminPassword,
@@ -217,4 +218,13 @@ export async function deleteQuickReplyAction(formData: FormData) {
   await requireAdmin();
   await removeQuickReply(formString(formData, 'id'));
   redirect('/quick-replies');
+}
+
+export async function saveFeatureFlagsAction(formData: FormData) {
+  const session = await requireAdmin();
+  await saveFeatureFlags(
+    { priorityGoldTheme: formString(formData, 'priorityGoldTheme') !== '0' },
+    session.id,
+  );
+  redirect('/features?saved=1');
 }

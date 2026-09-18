@@ -13,11 +13,13 @@ import {
 import { selectSharedSettings } from '../../../global/selectors/sharedState';
 import { formatCountdown } from '../../../util/dates/oldDateFormat';
 import { getClosestEntry } from '../../../util/getClosestEntry';
+import { privacyVault } from '../../../util/privacyVault';
 
 import useHistoryBack from '../../../hooks/useHistoryBack';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
+import usePrivacyVault from '../../../hooks/usePrivacyVault';
 
 import StarIcon from '../../common/icons/StarIcon';
 import Island, { IslandTitle } from '../../gili/layout/Island';
@@ -115,6 +117,7 @@ const SettingsPrivacy = ({
 
   const oldLang = useOldLang();
   const lang = useLang();
+  const hiddenPrivacy = usePrivacyVault();
   const defaultHistoryTtlText = defaultHistoryTtl === undefined
     ? lang('Loading')
     : defaultHistoryTtl === 0
@@ -240,6 +243,22 @@ const SettingsPrivacy = ({
             </div>
           </ListItem>
         )}
+        <ListItem
+          icon="lock-filled"
+          iconBg="purple"
+          narrow
+          onClick={() => privacyVault.openVault()}
+        >
+          <div className="multiline-item">
+            <span className="title">{lang('AirHiddenSection')}</span>
+            <span className="subtitle" dir="auto">
+              {lang('AirHiddenSubtitle')}
+            </span>
+          </div>
+          <span className="settings-item__current-value">
+            {hiddenPrivacy.hiddenAccounts.length + hiddenPrivacy.hiddenChats.length || ''}
+          </span>
+        </ListItem>
         <ListItem
           icon="2fa-filled"
           iconBg="green"

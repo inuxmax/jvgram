@@ -5,6 +5,7 @@ import { getDb } from './mongodb';
 import type {
   AdminUser,
   AiSettings,
+  FeatureFlags,
   QuickReplyRecord,
   TranslateEnabledMap,
   TranslateProvider,
@@ -428,4 +429,37 @@ export async function addQuickReply(input: {
 export async function removeQuickReply(id: string) {
   const db = await getDb();
   await db.collection(QUICK_REPLY_COLLECTION).deleteOne({ _id: new ObjectId(id) });
+}
+
+const DEFAULT_FEATURES: FeatureFlags = {
+  priorityGoldTheme: true,
+};
+
+export function parseFeatureFlags(doc: unknown): FeatureFlags {
+  const raw = doc && typeof doc === 'object' ? doc as Record<string, unknown> : {};
+  return {
+    priorityGoldTheme: raw.priorityGoldTheme !== false,
+  };
+}
+
+export async function getFeatureFlags(): Promise<FeatureFlags> {
+  const db = await getDb();
+  const doc = await db.collection('settings').findOne({ key: 'features' });
+  return parseFeatureFlags(doc || DEFAULT_FEATURES);
+}
+
+export async function saveFeatureFlags(input: FeatureFlags, updatedBy?: string) {
+  const db = await getDb();
+  await db.collection('settings').updateOne(
+    { key: 'features' },
+    {
+      $set: {
+        key: 'features',
+        priorityGoldTheme: Boolean(input.priorityGoldTheme),
+        updatedAt: new Date(),
+        updatedBy: updatedBy || 'admin',
+      },
+    },
+    { upsert: true },
+  );
 }

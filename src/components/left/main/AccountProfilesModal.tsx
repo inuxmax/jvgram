@@ -22,12 +22,14 @@ import {
   getNextFreeAccountSlot,
   storeAccountData,
 } from '../../../util/multiaccount';
+import { privacyVault } from '../../../util/privacyVault';
 
 import useAccountProfilesUi from '../../../hooks/useAccountProfilesUi';
 import useFlag from '../../../hooks/useFlag';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useMultiaccountInfo from '../../../hooks/useMultiaccountInfo';
+import { usePrivacyRevision } from '../../../hooks/usePrivacyVault';
 
 import Avatar from '../../common/Avatar';
 import FullNameTitle from '../../common/FullNameTitle';
@@ -57,6 +59,7 @@ const AccountProfilesModal = ({ currentUser }: StateProps) => {
   const lang = useLang();
   const { isOpen } = useAccountProfilesUi();
   const accounts = useMultiaccountInfo(currentUser);
+  const privacyRevision = usePrivacyRevision();
   const fileInputRef = useRef<HTMLInputElement>();
   const [searchQuery, setSearchQuery] = useState('');
   const [labelSlot, setLabelSlot] = useState<number | undefined>();
@@ -74,15 +77,21 @@ const AccountProfilesModal = ({ currentUser }: StateProps) => {
   }, [closeBackupConfirm, closeLabel, isOpen]);
 
   const currentSlot = ACCOUNT_SLOT || 1;
-  const accountEntries = useMemo(() => (
-    Object.entries(accounts)
+  const accountEntries = useMemo(() => {
+    void privacyRevision;
+    return Object.entries(accounts)
       .map(([slot, account]) => ({ slot: Number(slot), account }))
+      .filter(({ slot, account }) => {
+        const isCurrent = account.userId === currentUser?.id || slot === currentSlot;
+        if (!privacyVault.isAccountHidden(String(slot))) return true;
+        return isCurrent && privacyVault.isVaultUnlocked();
+      })
       .sort((a, b) => {
         if (a.account.userId === currentUser?.id) return -1;
         if (b.account.userId === currentUser?.id) return 1;
         return a.slot - b.slot;
-      })
-  ), [accounts, currentUser?.id]);
+      });
+  }, [accounts, currentUser?.id, currentSlot, privacyRevision]);
 
   const filteredAccounts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -215,6 +224,37 @@ const AccountProfilesModal = ({ currentUser }: StateProps) => {
         title: lang('AirProfilesBackupOne'),
         icon: 'download',
         handler: () => handleExportOne(slot),
+      },
+      { isSeparator: true, key: 'profile-hidden' },
+      {
+        title: privacyVault.isAccountHidden(String(slot))
+          ? lang('AirHiddenUnhideAccount')
+          : lang('AirHiddenHideAccount'),
+        icon: 'lock',
+        handler: () => {
+          const slotId = String(slot);
+          if (privacyVault.isAccountHidden(slotId)) {
+            if (privacyVault.hasPin() && !privacyVault.isVaultUnlocked()) {
+              privacyVault.openVault();
+              return;
+            }
+            void privacyVault.unhideAccount(slotId);
+            return;
+          }
+          void privacyVault.hideAccount(slotId).then(() => {
+            if (slot !== currentSlot) return;
+            const visible = Object.entries(accounts)
+              .map(([value]) => Number(value))
+              .filter((value) => !privacyVault.isAccountHidden(String(value)));
+            privacyVault.lockVault();
+            if (visible.length) {
+              const target = accounts[visible[0]];
+              window.location.href = getAccountSlotUrl(visible[0], undefined, target.isTest);
+              return;
+            }
+            privacyVault.openVault();
+          });
+        },
       },
     ];
   }
