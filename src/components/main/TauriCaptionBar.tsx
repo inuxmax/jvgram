@@ -141,7 +141,10 @@ const TauriCaptionBar = ({ withWorkspaceSwitcher }: OwnProps) => {
         </div>
       )}
       {!isChatHub && Boolean(accountName) && (
-        <span className={styles.accountName} title={accountName}>{accountName}</span>
+        <span className={styles.accountName} title={accountName}>
+          <Icon name="user" className={styles.accountNameIcon} />
+          <span className={styles.accountNameText}>{accountName}</span>
+        </span>
       )}
       <div className={styles.dragSpacer} data-tauri-drag-region={true} />
       {update && (

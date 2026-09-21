@@ -1,6 +1,6 @@
  [package]
 name = "telegram_air"
-version = "2.11.15"
+version = "2.11.16"
 description = "JVgram"
 authors = ["Alexander Zinchuk"]
 license = "GPLv3"
