@@ -23,6 +23,24 @@ export default function initTauriApi() {
     return core.invoke<void>('set_window_title', { title });
   }
 
+  async function showDesktopNotification(options: {
+    title: string;
+    body: string;
+    chatId?: string;
+    messageId?: number;
+    isCall?: boolean;
+    theme?: 'light' | 'dark';
+    avatarDataUrl?: string;
+  }) {
+    const core = await corePromise;
+    return core.invoke<void>('show_desktop_notification', options);
+  }
+
+  async function isAppWindowActive() {
+    const core = await corePromise;
+    return core.invoke<boolean>('is_app_window_active');
+  }
+
   // @ts-expect-error
   window.tauri ??= {};
   Object.assign(window.tauri, {
@@ -33,5 +51,7 @@ export default function initTauriApi() {
     checkUpdate: () => import('@tauri-apps/plugin-updater').then(({ check }) => check()),
     getCurrentWindow: () => import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow()),
     setWindowTitle,
+    showDesktopNotification,
+    isAppWindowActive,
   });
 }

@@ -57,6 +57,3 @@ export type QuickReplyRecord = {
   createdAt: string;
 };
 
-export type FeatureFlags = {
-  priorityGoldTheme: boolean;
-};

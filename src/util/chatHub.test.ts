@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, test } from 'vitest';
 
 import {
-  applyChatHubPrivacy,
   buildUnifiedChatKey,
   buildUnifiedChatsFromGlobal,
   buildUnifiedFolderKey,
@@ -12,6 +11,11 @@ import {
   createChatHubStore,
   DEFAULT_CHAT_HUB_HOTKEY,
   filterUnifiedChats,
+  getGlobalStateCacheKeyForSlot,
+  getGlobalStateCacheKeysForSlot,
+  listChatHubAccountSlots,
+  listChatHubThreadMessages,
+  parseGlobalStateCacheSlot,
   sortUnifiedChats,
   type UnifiedChat,
 } from './chatHub';
@@ -38,6 +42,8 @@ const storage = {
 
 afterEach(() => {
   memory.clear();
+  localStorage.removeItem('account3');
+  localStorage.removeItem('account4');
 });
 
 function buildSlice(): ChatHubGlobalSlice {
@@ -123,7 +129,26 @@ describe('ChatHub aggregator', () => {
   test('Sorts by latest activity across accounts', () => {
     const merged = sortUnifiedChats([...chatsForAccount('1'), ...chatsForAccount('2')]);
     expect(merged[0]?.chatId).toBe('300');
+    expect(merged[0]?.isPinned).toBe(true);
     expect(merged[0]?.lastMessageDate).toBe(300);
+  });
+
+  test('Keeps pinned chats above newer unpinned chats', () => {
+    const chats = chatsForAccount('1').map((chat) => (
+      chat.chatId === '300' ? { ...chat, lastMessageDate: 1 } : chat
+    ));
+    const sorted = sortUnifiedChats(chats);
+    expect(sorted[0]?.chatId).toBe('300');
+    expect(sorted[0]?.isPinned).toBe(true);
+    expect(sorted[1]?.isPinned).toBe(false);
+    expect(sorted[1]?.lastMessageDate).toBe(250);
+  });
+
+  test('Drops duplicate chat keys', () => {
+    const chats = [...chatsForAccount('1'), ...chatsForAccount('1')];
+    const sorted = sortUnifiedChats(chats);
+    const keys = sorted.map((chat) => chat.key);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   test('Classifies private, group, channel, bot, and saved chats', () => {
@@ -175,29 +200,14 @@ describe('ChatHub aggregator', () => {
     }).some((chat) => chat.type === 'channel')).toBe(false);
   });
 
-  test('Hides locked accounts and chats', () => {
-    const chats = [...chatsForAccount('1'), ...chatsForAccount('3')];
-    const visible = applyChatHubPrivacy(chats, {
-      isVaultUnlocked: false,
-      hiddenAccountIds: new Set(['3']),
-      hiddenChatsByAccount: { 1: new Set(['200']) },
-    }, (accountId) => (
-      accountId === '1' ? new Set(['200']) : new Set()
-    ));
-
-    expect(visible.some((chat) => chat.accountId === '3')).toBe(false);
-    expect(visible.some((chat) => chat.chatId === '200')).toBe(false);
-    expect(visible.some((chat) => chat.chatId === '300')).toBe(true);
-  });
-
-  test('Shows hidden rows when the vault is unlocked', () => {
-    const chats = chatsForAccount('3');
-    const visible = applyChatHubPrivacy(chats, {
-      isVaultUnlocked: true,
-      hiddenAccountIds: new Set(['3']),
-      hiddenChatsByAccount: {},
+  test('Lists thread messages in date order', () => {
+    const messages = listChatHubThreadMessages({
+      2: { date: 20, isOutgoing: true, content: { text: { text: 'Later' } } },
+      1: { date: 10, content: { text: { text: 'Earlier' } } },
     });
-    expect(visible).toHaveLength(chats.length);
+
+    expect(messages.map((message) => message.text)).toEqual(['Earlier', 'Later']);
+    expect(messages[1].isOutgoing).toBe(true);
   });
 });
 
@@ -211,12 +221,58 @@ describe('ChatHub store', () => {
     const restored = createChatHubStore({ storage });
     expect(restored.getState().workspace).toBe('chathub');
     expect(restored.getState().settings.compactMode).toBe(true);
-    expect(restored.getState().settings.viewMode).toBe('grouped');
+    expect(restored.getState().settings.viewMode).toBe('unified');
     expect(restored.getState().priorityKeys).toEqual(['1:200']);
     expect(memory.get(CHAT_HUB_STORAGE_KEY)).toBeTruthy();
   });
 
-  test('Rejects an invalid hotkey and keeps the default', () => {
+  test('Opening ChatHub shows chats from every account', () => {
+    const store = createChatHubStore({ storage });
+    store.setSelectedAccountIds(['1']);
+    store.setSelectedFolderKey('1:10');
+    store.openChatHub();
+    expect(store.getState().selectedAccountIds).toEqual([]);
+    expect(store.getState().selectedFolderKey).toBeUndefined();
+  });
+
+  test('Slot 1 and slot 2 use separate cache keys', () => {
+    expect(getGlobalStateCacheKeyForSlot(1)).toBe('tt-global-state');
+    expect(getGlobalStateCacheKeysForSlot(1)).toContain('tt-global-state');
+    expect(getGlobalStateCacheKeyForSlot(2)).toBe('tt-global-state_2');
+    expect(parseGlobalStateCacheSlot('tt-global-state')).toBe(1);
+    expect(parseGlobalStateCacheSlot('tt-global-state_2')).toBe(2);
+  });
+
+  test('Lists every local session slot', () => {
+    localStorage.setItem('account3', JSON.stringify({ dcId: 2, userId: '300' }));
+    localStorage.setItem('account4', JSON.stringify({ userId: '400' }));
+    const slots = listChatHubAccountSlots();
+    expect(slots).toContain(3);
+    expect(slots).toContain(4);
+  });
+
+  test('Includes archived and extra chat ids', () => {
+    const chats = buildUnifiedChatsFromGlobal({
+      slice: {
+        ...buildSlice(),
+        chats: {
+          ...buildSlice().chats,
+          listIds: {
+            active: ['200'],
+            archived: ['300'],
+          },
+        },
+      },
+      accountId: '1',
+      accountName: 'Account 1',
+      isLive: true,
+      savedTitle: 'Saved Messages',
+      extraChatIds: ['400'],
+    });
+    expect(chats.map((chat) => chat.chatId).sort()).toEqual(['200', '300', '400']);
+  });
+
+  test('Keeps empty hotkey as the default', () => {
     const store = createChatHubStore({ storage });
     store.patchSettings({ hotkey: '' });
     expect(store.getState().settings.hotkey).toBe(DEFAULT_CHAT_HUB_HOTKEY);

@@ -18,7 +18,6 @@ import { getSenderName } from './helpers/getSenderName';
 
 import { useIntersectionObserver } from '../../../hooks/useIntersectionObserver';
 import useOldLang from '../../../hooks/useOldLang';
-import { useVisibleSearchResultKeys } from '../../../hooks/usePrivacyVault';
 import useAsyncRendering from '../../right/hooks/useAsyncRendering';
 
 import NothingFound from '../../common/NothingFound';
@@ -43,15 +42,13 @@ const LinkResults: FC<OwnProps & StateProps> = ({
   chatsById,
   usersById,
   globalMessagesByChatId,
-  foundIds: rawFoundIds,
+  foundIds,
   isChatProtected,
 }) => {
   const {
     searchMessagesGlobal,
     focusMessage,
   } = getActions();
-
-  const foundIds = useVisibleSearchResultKeys(rawFoundIds);
   const containerRef = useRef<HTMLDivElement>();
 
   const lang = useOldLang();

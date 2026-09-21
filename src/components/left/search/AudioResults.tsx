@@ -17,7 +17,6 @@ import { createMapStateToProps } from './helpers/createMapStateToProps';
 import { getSenderName } from './helpers/getSenderName';
 
 import useOldLang from '../../../hooks/useOldLang';
-import { useVisibleSearchResultKeys } from '../../../hooks/usePrivacyVault';
 import useAsyncRendering from '../../right/hooks/useAsyncRendering';
 
 import Audio from '../../common/Audio';
@@ -42,7 +41,7 @@ const AudioResults: FC<OwnProps & StateProps> = ({
   chatsById,
   usersById,
   globalMessagesByChatId,
-  foundIds: rawFoundIds,
+  foundIds,
   activeDownloads,
 }) => {
   const {
@@ -51,7 +50,6 @@ const AudioResults: FC<OwnProps & StateProps> = ({
     openAudioPlayer,
   } = getActions();
 
-  const foundIds = useVisibleSearchResultKeys(rawFoundIds);
   const lang = useOldLang();
   const currentType = isVoice ? 'voice' : 'audio';
   const handleLoadMore = useCallback(({ direction }: { direction: LoadMoreDirection }) => {

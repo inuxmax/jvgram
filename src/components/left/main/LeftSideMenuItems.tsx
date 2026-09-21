@@ -28,9 +28,9 @@ import { IS_MULTIACCOUNT_SUPPORTED, IS_TAURI } from '../../../util/browser/globa
 import { chatHubStore } from '../../../util/chatHub';
 import { getPromptInstall } from '../../../util/installPrompt';
 import { switchPermanentWebVersion } from '../../../util/permanentWebVersion';
-import { privacyVault } from '../../../util/privacyVault';
 import { getSystemTheme } from '../../../util/systemTheme';
 
+import { useChatHubWorkspace } from '../../../hooks/useChatHub';
 import { useFolderManagerForUnreadCounters } from '../../../hooks/useFolderManager';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
@@ -84,6 +84,8 @@ const LeftSideMenuItems = ({
     openChatWithInfo,
   } = getActions();
   const lang = useLang();
+  const { workspace } = useChatHubWorkspace();
+  const isChatHubOpen = workspace === 'chathub';
 
   const animationLevelValue = animationLevel !== ANIMATION_LEVEL_MIN
     ? (animationLevel === ANIMATION_LEVEL_MAX ? 'max' : 'mid') : 'min';
@@ -208,18 +210,29 @@ const LeftSideMenuItems = ({
       >
         {lang('MenuTranslate')}
       </MenuItem>
-      <MenuItem
-        icon="lock"
-        onClick={() => privacyVault.openVault()}
-      >
-        {lang('AirHiddenVault')}
-      </MenuItem>
-      <MenuItem
-        icon="forums"
-        onClick={() => chatHubStore.openChatHub()}
-      >
-        {lang('ChatHubOpen')}
-      </MenuItem>
+      {isChatHubOpen ? (
+        <>
+          <MenuItem
+            icon="arrow-left"
+            onClick={() => chatHubStore.openTelegram()}
+          >
+            {lang('ChatHubBackToTelegram')}
+          </MenuItem>
+          <MenuItem
+            icon="settings"
+            onClick={() => chatHubStore.openSettings()}
+          >
+            {lang('ChatHubSettings')}
+          </MenuItem>
+        </>
+      ) : (
+        <MenuItem
+          icon="forums"
+          onClick={() => chatHubStore.openChatHub()}
+        >
+          {lang('ChatHubOpen')}
+        </MenuItem>
+      )}
       <NestedMenuItem
         icon="more"
         footer={footer}

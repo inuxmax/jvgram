@@ -133,7 +133,10 @@ async function fetchFromCacheOrRemote(
 ): Promise<string> {
   if (!MEDIA_CACHE_DISABLED) {
     const cacheName = url.startsWith('avatar') ? MEDIA_CACHE_NAME_AVATARS : MEDIA_CACHE_NAME;
-    const cached = await cacheApi.fetch(cacheName, url, asCacheApiType[mediaFormat]!, isHtmlAllowed);
+    let cached = await cacheApi.fetch(cacheName, url, asCacheApiType[mediaFormat]!, isHtmlAllowed);
+    if (!cached) {
+      cached = await cacheApi.fetchFromAccountScopes(cacheName, url, asCacheApiType[mediaFormat]!, isHtmlAllowed);
+    }
 
     if (cached) {
       let media = cached;

@@ -15,7 +15,6 @@ import { renderMessageSummary } from '../../common/helpers/renderMessageText';
 
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
-import { useVisibleSearchResultKeys } from '../../../hooks/usePrivacyVault';
 
 import NothingFound from '../../common/NothingFound';
 import Island from '../../gili/layout/Island';
@@ -42,7 +41,7 @@ const runThrottled = throttle((cb) => cb(), 500, true);
 
 const PublicPostsResults = ({
   searchQuery,
-  foundIds: rawFoundIds,
+  foundIds,
   globalMessagesByChatId,
   searchFlood,
   shouldShowSearchLauncher,
@@ -53,7 +52,6 @@ const PublicPostsResults = ({
   const { searchMessagesGlobal } = getActions();
 
   const lang = useLang();
-  const foundIds = useVisibleSearchResultKeys(rawFoundIds);
 
   const handleSearch = useLastCallback(() => {
     if (!searchQuery) return;

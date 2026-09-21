@@ -1,6 +1,7 @@
 @use "../../../styles/mixins";
 
-#LeftMainHeader {
+#LeftMainHeader,
+#ChatHubMainHeader {
   position: relative;
 
   .main-menu {
@@ -179,6 +180,7 @@
 }
 
 #LeftMainHeader,
+#ChatHubMainHeader,
 .Menu.main-menu.in-portal {
   .account-menu-item {
     --custom-emoji-size: 1rem;

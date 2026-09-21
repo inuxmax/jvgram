@@ -2,7 +2,7 @@ import '../../global/actions/all';
 
 import {
   beginHeavyAnimation,
-  memo, onFullyIdle, useEffect, useLayoutEffect, useMemo,
+  memo, onFullyIdle, useEffect, useLayoutEffect,
   useRef, useState,
 } from '../../lib/teact/teact';
 import { addExtraClass, setExtraStyles } from '../../lib/teact/teact-dom';
@@ -10,6 +10,9 @@ import { getActions, getGlobal, withGlobal } from '../../global';
 
 import type { ApiChatFolder, ApiLimitTypeWithModal, ApiStarGiftAuctionState, ApiUser } from '../../api/types';
 import type { TabState } from '../../global/types';
+import { LeftColumnContent } from '../../types';
+
+import { MAIN_THREAD_ID } from '../../api/types';
 
 import { BASE_EMOJI_KEYWORD_LANG, DEBUG, FOLDERS_POSITION_LEFT, INACTIVE_MARKER } from '../../config';
 import { requestNextMutation } from '../../lib/fasterdom/fasterdom';
@@ -26,6 +29,7 @@ import {
   selectIsReactionPickerOpen,
   selectIsRightColumnShown,
   selectIsStoryViewerOpen,
+  selectLeftColumnContentKey,
   selectPerformanceSettingsValue,
   selectTabSelectedGiftAuction,
   selectTabState,
@@ -33,13 +37,15 @@ import {
 } from '../../global/selectors';
 import { selectSharedSettings } from '../../global/selectors/sharedState';
 import { IS_TAURI } from '../../util/browser/globalEnvironment';
+import { IFRAME_ALLOW_ATTRIBUTES } from '../../util/browser/iframe';
 import { IS_ANDROID, IS_MAC_OS, IS_WAVE_TRANSFORM_SUPPORTED } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
+import { buildChatHubAccountChatUrl, IS_CHAT_HUB_EMBED } from '../../util/chatHub';
 import { waitForTransitionEnd } from '../../util/cssAnimationEndListeners';
 import { processDeepLink } from '../../util/deeplink';
 import { Bundles, loadBundle } from '../../util/moduleLoader';
-import { privacyVault } from '../../util/privacyVault';
-import { parseInitialLocationHash, parseLocationHash } from '../../util/routing';
+import { getHotkeyMatcher } from '../../util/parseHotkey';
+import { createLocationHash, parseInitialLocationHash, parseLocationHash } from '../../util/routing';
 import updateIcon from '../../util/updateIcon';
 import { REM } from '../common/helpers/mediaDimensions';
 import { updateTopReserveWithScrollCompensation } from '../middle/helpers/messageListReserves';
@@ -50,7 +56,6 @@ import useTauriEvent from '../../hooks/tauri/useTauriEvent';
 import useAppLayout from '../../hooks/useAppLayout';
 import { useChatHubWorkspace } from '../../hooks/useChatHub';
 import useForceUpdate from '../../hooks/useForceUpdate';
-import { useHotkeys } from '../../hooks/useHotkeys';
 import useLang from '../../hooks/useLang';
 import useLastCallback from '../../hooks/useLastCallback';
 import usePreventPinchZoomGesture from '../../hooks/usePreventPinchZoomGesture';
@@ -74,7 +79,6 @@ import Wallpaper from '../common/Wallpaper';
 import LeftColumn from '../left/LeftColumn';
 import AccountProfilesModal from '../left/main/AccountProfilesModal';
 import AirTranslateSettingsModal from '../left/main/AirTranslateSettingsModal';
-import PrivacyVaultModal from '../left/privacy/PrivacyVaultModal';
 import MediaViewer from '../mediaViewer/MediaViewer.async';
 import AirQuickReplySettingsModal from '../middle/composer/AirQuickReplySettingsModal';
 import ReactionPicker from '../middle/message/reactions/ReactionPicker.async';
@@ -156,6 +160,7 @@ type StateProps = {
   isAccountFrozen?: boolean;
   isAppConfigLoaded?: boolean;
   isFoldersSidebarShown: boolean;
+  leftColumnContentKey: LeftColumnContent;
   diceEmojies?: string[];
   selectedGiftAuction?: ApiStarGiftAuctionState;
 };
@@ -211,6 +216,7 @@ const Main = ({
   isAccountFrozen,
   isAppConfigLoaded,
   isFoldersSidebarShown,
+  leftColumnContentKey,
   diceEmojies,
   selectedGiftAuction,
 }: OwnProps & StateProps) => {
@@ -285,19 +291,52 @@ const Main = ({
   }
 
   const lang = useLang();
-  const { workspace, settings, toggleWorkspace } = useChatHubWorkspace();
+  const { workspace, settings, embeddedChat, toggleWorkspace, openTelegram } = useChatHubWorkspace();
   const isChatHubOpen = workspace === 'chathub';
+  const embeddedChatSrc = embeddedChat
+    ? buildChatHubAccountChatUrl(embeddedChat.accountId, embeddedChat.chatId, 'telegram')
+    : undefined;
+  const embedFrameRef = useRef<HTMLIFrameElement>();
+  const lastEmbedAccountIdRef = useRef<string>();
+  const [embedFrameSrc, setEmbedFrameSrc] = useState<string>();
 
-  useHotkeys(useMemo(() => ({
-    [settings.hotkey]: (e: KeyboardEvent) => {
-      e.preventDefault();
-      toggleWorkspace();
-    },
-  }), [settings.hotkey, toggleWorkspace]));
+  useLayoutEffect(() => {
+    if (!isChatHubOpen || !embeddedChat || !embeddedChatSrc) return;
+
+    const frame = embedFrameRef.current;
+    const isSameAccount = lastEmbedAccountIdRef.current === embeddedChat.accountId;
+    lastEmbedAccountIdRef.current = embeddedChat.accountId;
+
+    if (isSameAccount && frame?.contentWindow) {
+      frame.contentWindow.location.hash = createLocationHash(embeddedChat.chatId, 'thread', MAIN_THREAD_ID);
+      return;
+    }
+
+    setEmbedFrameSrc(embeddedChatSrc);
+  }, [embeddedChat, embeddedChatSrc, isChatHubOpen]);
 
   useEffect(() => {
-    void privacyVault.init();
-  }, []);
+    if (!isChatHubOpen || leftColumnContentKey === LeftColumnContent.ChatList) {
+      return;
+    }
+    openTelegram();
+  }, [isChatHubOpen, leftColumnContentKey, openTelegram]);
+
+  useEffect(() => {
+    const matchesHotkey = getHotkeyMatcher(settings.hotkey);
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!matchesHotkey(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      toggleWorkspace();
+    }
+
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [settings.hotkey, toggleWorkspace]);
 
   // Preload Calls bundle to initialize sounds for iOS
   useTimeout(() => {
@@ -577,7 +616,9 @@ const Main = ({
     isNarrowMessageList && 'narrow-message-list',
     shouldSkipHistoryAnimations && 'history-animation-disabled',
     isFullscreen && 'is-fullscreen',
-    isFoldersSidebarShown && 'folders-sidebar-visible',
+    isFoldersSidebarShown && !isChatHubOpen && 'folders-sidebar-visible',
+    isChatHubOpen && 'chatHub-open',
+    isChatHubOpen && embeddedChatSrc && 'chatHub-embed-open',
   );
 
   const handleBlur = useLastCallback(() => {
@@ -639,10 +680,18 @@ const Main = ({
       {IS_TAURI && IS_MAC_OS && (
         <div className="tauri-drag-region" data-tauri-drag-region />
       )}
-      <div
-        className={buildClassName('telegramWorkspace', isChatHubOpen && 'telegramWorkspaceHidden')}
-        aria-hidden={isChatHubOpen}
-      >
+      {isChatHubOpen && !IS_CHAT_HUB_EMBED && <ChatHub />}
+      {isChatHubOpen && embedFrameSrc && !IS_CHAT_HUB_EMBED && (
+        <iframe
+          ref={embedFrameRef}
+          id="ChatHubAccountFrame"
+          className={buildClassName('chathubAccountFrame', !embeddedChatSrc && 'isHidden')}
+          src={embedFrameSrc}
+          title={lang('ChatHub')}
+          allow={IFRAME_ALLOW_ATTRIBUTES}
+        />
+      )}
+      <div className={buildClassName('telegramWorkspace', isChatHubOpen && 'telegramWorkspaceChatHub')}>
         <FoldersSidebar isMobile={isMobile} isActive={isFoldersSidebarShown} />
         <LeftColumn ref={leftColumnRef} isFoldersSidebarShown={isFoldersSidebarShown} />
         <MiddleColumn
@@ -652,7 +701,6 @@ const Main = ({
         />
         <RightColumn isMobile={isMobile} />
       </div>
-      {isChatHubOpen && <ChatHub />}
       <MediaViewer isOpen={isMediaViewerOpen} />
       <StoryViewer isOpen={isStoryViewerOpen} />
       <ForwardRecipientPicker isOpen={isForwardModalOpen} />
@@ -707,7 +755,6 @@ const Main = ({
       <AirTranslateSettingsModal />
       <AirQuickReplySettingsModal />
       <AccountProfilesModal />
-      <PrivacyVaultModal />
     </Wallpaper>
   );
 };
@@ -798,6 +845,7 @@ export default memo(withGlobal<OwnProps>(
       isAccountFrozen,
       isAppConfigLoaded: global.isAppConfigLoaded,
       isFoldersSidebarShown: foldersPosition === FOLDERS_POSITION_LEFT && !isMobile && selectAreFoldersPresent(global),
+      leftColumnContentKey: selectLeftColumnContentKey(global),
       diceEmojies: global.appConfig?.diceEmojies,
       selectedGiftAuction,
     };

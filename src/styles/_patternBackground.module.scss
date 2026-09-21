@@ -115,20 +115,3 @@
     opacity: var(--pattern-intensity, 0.5);
   }
 }
-
-.goldWallpaper {
-  pointer-events: none;
-
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-
-  opacity: var(--priority-gold-wallpaper-opacity, 0);
-  background-image: var(--priority-gold-wallpaper);
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: var(--priority-gold-wallpaper-size, contain);
-}

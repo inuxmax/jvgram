@@ -3,6 +3,7 @@ import { getActions, withGlobal } from '../../../global';
 
 import type { ApiNotifyPeerType, ApiPeerNotifySettings } from '../../../api/types';
 
+import { IS_TAURI } from '../../../util/browser/globalEnvironment';
 import {
   checkIfNotificationsSupported,
   checkIfOfflinePushFailed,
@@ -142,11 +143,11 @@ const SettingsNotifications = ({
   return (
     <div className="settings-content custom-scroll">
       <IslandTitle dir={lang.isRtl ? 'rtl' : undefined}>
-        {lang('NotificationsWeb')}
+        {lang(IS_TAURI ? 'NotificationsDesktop' : 'NotificationsWeb')}
       </IslandTitle>
       <Island>
         <Checkbox
-          label={lang('NotificationsWeb')}
+          label={lang(IS_TAURI ? 'NotificationsDesktop' : 'NotificationsWeb')}
           subLabel={lang(hasWebNotifications ? 'UserInfoNotificationsEnabled' : 'UserInfoNotificationsDisabled')}
           checked={hasWebNotifications}
           disabled={!areNotificationsSupported}

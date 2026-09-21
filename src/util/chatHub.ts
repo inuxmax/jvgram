@@ -1,14 +1,18 @@
 import type { GlobalState } from '../global/types';
 import { MAIN_THREAD_ID } from '../api/types';
 
-import { GLOBAL_STATE_CACHE_PREFIX } from '../config';
+import { GLOBAL_STATE_CACHE_PREFIX, SESSION_ACCOUNT_PREFIX } from '../config';
 import { MAIN_IDB_STORE } from './browser/idb';
-import { ACCOUNT_SLOT, getAccountDisplayName, getAccountsInfo } from './multiaccount';
+import { unique, uniqueByField } from './iteratees';
+import { ACCOUNT_SLOT, getAccountDisplayName, getAccountsInfo, getAccountSlotUrl } from './multiaccount';
 import { parseHotkey } from './parseHotkey';
-import { privacyVault } from './privacyVault';
+import { createLocationHash } from './routing';
 
 export const CHAT_HUB_STORAGE_KEY = 'taa.chathub';
-export const DEFAULT_CHAT_HUB_HOTKEY = 'Ctrl+Shift+U';
+const WINDOW_WORKSPACE_KEY = `taa.chathub.windowWorkspace.${ACCOUNT_SLOT || 1}`;
+const WINDOW_EMBED_KEY = `taa.chathub.embed.${ACCOUNT_SLOT || 1}`;
+export const DEFAULT_CHAT_HUB_HOTKEY = 'Ctrl+Tab';
+const LEGACY_CHAT_HUB_HOTKEY = 'Ctrl+Shift+U';
 export const CHAT_HUB_ROW_HEIGHT_PX = 72;
 export const CHAT_HUB_COMPACT_ROW_HEIGHT_PX = 56;
 
@@ -25,6 +29,16 @@ export type ChatHubFilter =
   | 'channels'
   | 'bots';
 export type UnifiedChatType = 'private' | 'group' | 'channel' | 'bot' | 'saved';
+export type ChatHubMessageKind =
+  | 'text'
+  | 'photo'
+  | 'video'
+  | 'sticker'
+  | 'document'
+  | 'voice'
+  | 'audio'
+  | 'action'
+  | 'other';
 
 export type ChatHubSettings = {
   showAccountBadge: boolean;
@@ -56,6 +70,8 @@ export type UnifiedChat = {
   folderIds: number[];
   accountName: string;
   accountAvatarUri?: string;
+  avatarPhotoId?: string;
+  emojiStatusId?: string;
   colorIndex: number;
 };
 
@@ -77,15 +93,41 @@ export type UnifiedAccount = {
   isOffline?: boolean;
 };
 
+export type ChatHubEmbeddedChat = {
+  accountId: string;
+  chatId: string;
+};
+
 export type ChatHubState = {
   workspace: ChatHubWorkspace;
   filter: ChatHubFilter;
   selectedAccountIds: string[];
   selectedFolderKey?: string;
+  selectedChatKey?: string;
+  embeddedChat?: ChatHubEmbeddedChat;
   searchQuery: string;
   isSettingsOpen: boolean;
   settings: ChatHubSettings;
   priorityKeys: string[];
+};
+
+export type ChatHubThreadMessage = {
+  id: number;
+  date: number;
+  isOutgoing: boolean;
+  kind: ChatHubMessageKind;
+  text?: string;
+};
+
+type ChatHubCachedContent = {
+  text?: { text?: string };
+  photo?: unknown;
+  video?: unknown;
+  sticker?: unknown;
+  document?: unknown;
+  voice?: unknown;
+  audio?: unknown;
+  action?: unknown;
 };
 
 export type ChatHubGlobalSlice = {
@@ -98,18 +140,17 @@ export type ChatHubGlobalSlice = {
       type?: string;
       usernames?: Array<{ username?: string; isActive?: boolean }>;
       folderId?: number;
+      avatarPhotoId?: string;
+      emojiStatus?: { documentId?: string };
     }>;
-    listIds?: { active?: string[] };
-    orderedPinnedIds?: { active?: string[] };
+    listIds?: { active?: string[]; archived?: string[]; saved?: string[] };
+    orderedPinnedIds?: { active?: string[]; archived?: string[] };
     lastMessageIds?: { all?: Record<string, number> };
     notifyExceptionById?: Record<string, { mutedUntil?: number }>;
   };
   messages?: {
     byChatId?: Record<string, {
-      byId?: Record<number, {
-        date?: number;
-        content?: { text?: { text?: string } };
-      }>;
+      byId?: Record<number, unknown>;
       threadsById?: Record<string | number, {
         readState?: {
           unreadCount?: number;
@@ -125,6 +166,8 @@ export type ChatHubGlobalSlice = {
       type?: string;
       firstName?: string;
       lastName?: string;
+      avatarPhotoId?: string;
+      emojiStatus?: { documentId?: string };
     }>;
   };
   chatFolders?: {
@@ -136,13 +179,6 @@ export type ChatHubGlobalSlice = {
       pinnedChatIds?: string[];
     }>;
   };
-};
-
-export type ChatHubPrivacy = {
-  isVaultUnlocked: boolean;
-  hiddenAccountIds: Set<string>;
-  hiddenChatsByAccount: Record<string, Set<string>>;
-  revision?: number;
 };
 
 type Listener = NoneToVoidFunction;
@@ -179,6 +215,7 @@ const DEFAULT_STATE: ChatHubState = {
 const FILTERS: ChatHubFilter[] = [
   'all', 'priority', 'unread', 'mentions', 'pinned', 'private', 'groups', 'channels', 'bots',
 ];
+const MAX_THREAD_MESSAGES = 120;
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -206,6 +243,21 @@ export function buildUnifiedChatKey(accountId: string, chatId: string) {
   return `${accountId}:${chatId}`;
 }
 
+export function buildChatHubAccountChatUrl(
+  accountId: string,
+  chatId: string,
+  workspace: ChatHubWorkspace = 'telegram',
+) {
+  const slot = Number(accountId);
+  const info = getAccountsInfo()[slot];
+  const url = new URL(getAccountSlotUrl(slot, false, info?.isTest));
+  url.searchParams.set('chat', chatId);
+  url.searchParams.set('workspace', workspace);
+  url.searchParams.set('embed', 'chathub');
+  url.hash = createLocationHash(chatId, 'thread', MAIN_THREAD_ID);
+  return url.toString();
+}
+
 export function buildUnifiedFolderKey(accountId: string, folderId: number) {
   return `${accountId}:${folderId}`;
 }
@@ -214,14 +266,33 @@ export function getGlobalStateCacheKeyForSlot(slot: number) {
   return slot === 1 ? GLOBAL_STATE_CACHE_PREFIX : `${GLOBAL_STATE_CACHE_PREFIX}_${slot}`;
 }
 
+export function getGlobalStateCacheKeysForSlot(slot: number) {
+  if (slot === 1) {
+    return [GLOBAL_STATE_CACHE_PREFIX, `${GLOBAL_STATE_CACHE_PREFIX}_1`];
+  }
+  return [`${GLOBAL_STATE_CACHE_PREFIX}_${slot}`];
+}
+
+export function parseGlobalStateCacheSlot(key: string) {
+  if (key === GLOBAL_STATE_CACHE_PREFIX) return 1;
+  const prefix = `${GLOBAL_STATE_CACHE_PREFIX}_`;
+  if (!key.startsWith(prefix)) return undefined;
+  const rest = key.slice(prefix.length);
+  if (!/^\d+$/.test(rest)) return undefined;
+  return Number(rest);
+}
+
 export function isValidChatHubHotkey(value: string) {
   const parsed = parseHotkey(value);
   return Boolean(parsed.key);
 }
 
 function normalizeSettings(raw?: Record<string, unknown>): ChatHubSettings {
-  const hotkey = asString(raw?.hotkey).trim() || DEFAULT_CHAT_HUB_HOTKEY;
-  const viewMode = raw?.viewMode === 'grouped' ? 'grouped' : 'unified';
+  const storedHotkey = asString(raw?.hotkey).trim();
+  const hotkey = !storedHotkey || storedHotkey === LEGACY_CHAT_HUB_HOTKEY
+    ? DEFAULT_CHAT_HUB_HOTKEY
+    : storedHotkey;
+  const viewMode: ChatHubViewMode = 'unified';
 
   return {
     showAccountBadge: asBoolean(raw?.showAccountBadge, true),
@@ -260,6 +331,47 @@ function readStored(storage: StoreOptions['storage']): Partial<ChatHubState> | u
   }
 }
 
+function readWindowEmbed() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('embed') === 'chathub') {
+      sessionStorage.setItem(WINDOW_EMBED_KEY, '1');
+      url.searchParams.delete('embed');
+      window.history.replaceState(undefined, '', `${url.pathname}${url.search}${url.hash}`);
+      return true;
+    }
+    return sessionStorage.getItem(WINDOW_EMBED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export const IS_CHAT_HUB_EMBED = readWindowEmbed();
+
+if (IS_CHAT_HUB_EMBED && typeof document !== 'undefined') {
+  document.documentElement.classList.add('chathub-embed');
+}
+
+function readWindowWorkspace(): ChatHubWorkspace | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const url = new URL(window.location.href);
+    const requested = url.searchParams.get('workspace');
+    if (requested === 'telegram' || requested === 'chathub') {
+      sessionStorage.setItem(WINDOW_WORKSPACE_KEY, requested);
+      url.searchParams.delete('workspace');
+      window.history.replaceState(undefined, '', `${url.pathname}${url.search}${url.hash}`);
+      return requested;
+    }
+    const stored = sessionStorage.getItem(WINDOW_WORKSPACE_KEY);
+    if (stored === 'telegram' || stored === 'chathub') return stored;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 function resolveChatType(
   chatId: string,
   chatType: string | undefined,
@@ -273,6 +385,20 @@ function resolveChatType(
   return 'private';
 }
 
+function readAvatarPhotoId(chatAvatarPhotoId: unknown, userAvatarPhotoId: unknown) {
+  if (typeof chatAvatarPhotoId === 'string' && chatAvatarPhotoId) return chatAvatarPhotoId;
+  if (typeof userAvatarPhotoId === 'string' && userAvatarPhotoId) return userAvatarPhotoId;
+  return undefined;
+}
+
+function readEmojiStatusId(...values: unknown[]) {
+  for (const value of values) {
+    const documentId = asString(asRecord(value)?.documentId).trim();
+    if (documentId) return documentId;
+  }
+  return undefined;
+}
+
 function readThreadState(
   slice: ChatHubGlobalSlice,
   chatId: string,
@@ -282,13 +408,34 @@ function readThreadState(
   return thread?.readState;
 }
 
+function parseCachedMessage(raw: unknown) {
+  const record = asRecord(raw);
+  if (!record) return undefined;
+  const content = asRecord(record.content);
+  const text = asRecord(content?.text);
+  return {
+    date: typeof record.date === 'number' ? record.date : undefined,
+    isOutgoing: Boolean(record.isOutgoing),
+    content: {
+      text: typeof text?.text === 'string' ? { text: text.text } : undefined,
+      photo: content?.photo,
+      video: content?.video,
+      sticker: content?.sticker,
+      document: content?.document,
+      voice: content?.voice,
+      audio: content?.audio,
+      action: content?.action,
+    } satisfies ChatHubCachedContent,
+  };
+}
+
 function readLastMessage(
   slice: ChatHubGlobalSlice,
   chatId: string,
 ) {
   const lastId = slice.chats?.lastMessageIds?.all?.[chatId];
   if (!lastId) return undefined;
-  return slice.messages?.byChatId?.[chatId]?.byId?.[lastId];
+  return parseCachedMessage(slice.messages?.byChatId?.[chatId]?.byId?.[lastId]);
 }
 
 function buildFolderIdsForChat(
@@ -337,13 +484,22 @@ export function buildUnifiedChatsFromGlobal(options: {
   accountAvatarUri?: string;
   isLive: boolean;
   savedTitle: string;
+  extraChatIds?: string[];
 }): UnifiedChat[] {
   const {
-    slice, accountId, accountName, accountAvatarUri, isLive, savedTitle,
+    slice, accountId, accountName, accountAvatarUri, isLive, savedTitle, extraChatIds,
   } = options;
   const byId = slice.chats?.byId || {};
-  const listIds = slice.chats?.listIds?.active || Object.keys(byId);
-  const pinnedIds = new Set(slice.chats?.orderedPinnedIds?.active || []);
+  const listedIds = unique([
+    ...(extraChatIds || []),
+    ...(slice.chats?.listIds?.active || []),
+    ...(slice.chats?.listIds?.archived || []),
+  ].map(String).filter(Boolean));
+  const listIds = listedIds.length ? listedIds : Object.keys(byId).map(String);
+  const pinnedIds = new Set([
+    ...(slice.chats?.orderedPinnedIds?.active || []),
+    ...(slice.chats?.orderedPinnedIds?.archived || []),
+  ]);
   const folders = buildUnifiedFoldersFromGlobal(slice, accountId, accountName);
   const isConnecting = isLive && slice.connectionState === 'connectionStateConnecting';
   const seen = new Set<string>();
@@ -384,6 +540,8 @@ export function buildUnifiedChatsFromGlobal(options: {
       folderIds: buildFolderIdsForChat(chatId, folders, chat.folderId),
       accountName,
       accountAvatarUri,
+      avatarPhotoId: readAvatarPhotoId(chat.avatarPhotoId, user?.avatarPhotoId),
+      emojiStatusId: readEmojiStatusId(user?.emojiStatus, chat.emojiStatus),
       colorIndex: Math.abs(Number(chatId) || 0) % 7,
     });
   });
@@ -391,58 +549,60 @@ export function buildUnifiedChatsFromGlobal(options: {
   return chats;
 }
 
-export function getChatHubPrivacySnapshot(): ChatHubPrivacy {
-  return {
-    isVaultUnlocked: privacyVault.isVaultUnlocked(),
-    hiddenAccountIds: privacyVault.getHiddenAccountIds(),
-    hiddenChatsByAccount: {},
-  };
+function resolveChatHubMessageKind(content?: ChatHubCachedContent): ChatHubMessageKind {
+  if (content?.text?.text) return 'text';
+  if (content?.photo) return 'photo';
+  if (content?.video) return 'video';
+  if (content?.sticker) return 'sticker';
+  if (content?.document) return 'document';
+  if (content?.voice) return 'voice';
+  if (content?.audio) return 'audio';
+  if (content?.action) return 'action';
+  return 'other';
 }
 
-export function applyChatHubPrivacy(
-  chats: UnifiedChat[],
-  privacy: ChatHubPrivacy,
-  getHiddenChatIds: (accountId: string) => Set<string> = (accountId) => (
-    privacy.hiddenChatsByAccount[accountId] || new Set()
-  ),
+export function listChatHubThreadMessagesForChat(
+  slice: ChatHubGlobalSlice | undefined,
+  chatId: string,
 ) {
-  if (privacy.isVaultUnlocked) {
-    return chats;
-  }
+  return listChatHubThreadMessages(slice?.messages?.byChatId?.[chatId]?.byId);
+}
 
-  return chats.filter((chat) => {
-    if (privacy.hiddenAccountIds.has(chat.accountId)) return false;
-    return !getHiddenChatIds(chat.accountId).has(chat.chatId);
+export function listChatHubThreadMessages(
+  byId?: object,
+): ChatHubThreadMessage[] {
+  if (!byId) return [];
+
+  const messages = Object.entries(byId).map(([id, raw]) => {
+    const message = parseCachedMessage(raw);
+    const kind = resolveChatHubMessageKind(message?.content);
+    return {
+      id: Number(id),
+      date: message?.date || 0,
+      isOutgoing: Boolean(message?.isOutgoing),
+      kind,
+      text: message?.content?.text?.text,
+    } satisfies ChatHubThreadMessage;
+  }).sort((left, right) => {
+    if (left.date !== right.date) return left.date - right.date;
+    return left.id - right.id;
   });
-}
 
-export function applyChatHubAccountPrivacy(
-  accounts: UnifiedAccount[],
-  privacy: ChatHubPrivacy,
-) {
-  if (privacy.isVaultUnlocked) {
-    return accounts;
-  }
-  return accounts.filter((account) => !privacy.hiddenAccountIds.has(account.accountId));
-}
-
-export function applyChatHubFolderPrivacy(
-  folders: UnifiedFolder[],
-  privacy: ChatHubPrivacy,
-) {
-  if (privacy.isVaultUnlocked) {
-    return folders;
-  }
-  return folders.filter((folder) => !privacy.hiddenAccountIds.has(folder.accountId));
+  return messages.length > MAX_THREAD_MESSAGES
+    ? messages.slice(messages.length - MAX_THREAD_MESSAGES)
+    : messages;
 }
 
 export function sortUnifiedChats(chats: UnifiedChat[]) {
-  return [...chats].sort((left, right) => {
+  return uniqueByField([...chats].sort((left, right) => {
+    if (left.isPinned !== right.isPinned) {
+      return left.isPinned ? -1 : 1;
+    }
     if (right.lastMessageDate !== left.lastMessageDate) {
       return right.lastMessageDate - left.lastMessageDate;
     }
     return left.title.localeCompare(right.title);
-  });
+  }), 'key');
 }
 
 export function filterUnifiedChats(
@@ -517,36 +677,111 @@ export function groupUnifiedChats(chats: UnifiedChat[]) {
   return groups;
 }
 
+const ACCOUNT_SLOT_KEY = new RegExp(`^${SESSION_ACCOUNT_PREFIX}(\\d+)$`);
+
+function readChatHubSessionSlot(slot: number) {
+  try {
+    const raw = localStorage.getItem(`${SESSION_ACCOUNT_PREFIX}${slot}`);
+    if (!raw) return undefined;
+    const data = JSON.parse(raw) as Record<string, unknown>;
+    if (data.dcId || data.userId) return data;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function listChatHubAccountSlots() {
+  const liveSlot = Number(getCurrentChatHubAccountId());
+  const slots = new Set<number>([liveSlot]);
+
+  if (typeof localStorage === 'object') {
+    Object.keys(localStorage).forEach((key) => {
+      const match = key.match(ACCOUNT_SLOT_KEY);
+      if (!match) return;
+      const slot = Number(match[1]);
+      if (!slot || Number.isNaN(slot)) return;
+      if (readChatHubSessionSlot(slot)) {
+        slots.add(slot);
+      }
+    });
+  }
+
+  Object.keys(getAccountsInfo()).forEach((accountId) => {
+    const slot = Number(accountId);
+    if (slot) slots.add(slot);
+  });
+
+  return [...slots].sort((left, right) => left - right);
+}
+
 export function listChatHubAccounts(): UnifiedAccount[] {
   const liveId = getCurrentChatHubAccountId();
   const info = getAccountsInfo();
-  const slots = Object.keys(info).map(Number).sort((left, right) => left - right);
-
-  if (!slots.length) {
-    return [{
-      accountId: liveId,
-      name: `Account ${liveId}`,
-      isLive: true,
-    }];
-  }
+  const slots = listChatHubAccountSlots();
 
   return slots.map((slot) => {
     const account = info[slot];
     return {
       accountId: String(slot),
-      name: getAccountDisplayName(account) || `Account ${slot}`,
-      avatarUri: account.avatarUri,
+      name: (account && getAccountDisplayName(account)) || `Account ${slot}`,
+      avatarUri: account?.avatarUri,
       isLive: String(slot) === liveId,
     };
   });
 }
 
-export async function loadCachedGlobalForSlot(slot: number) {
+function readLocalStorageGlobal(slot: number) {
+  if (typeof localStorage !== 'object') return undefined;
   try {
-    return await MAIN_IDB_STORE.get<GlobalState>(getGlobalStateCacheKeyForSlot(slot));
+    for (const key of getGlobalStateCacheKeysForSlot(slot)) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as GlobalState;
+      if (parsed?.chats) return parsed;
+    }
   } catch {
     return undefined;
   }
+  return undefined;
+}
+
+export async function loadCachedGlobalForSlot(slot: number) {
+  try {
+    const keys = getGlobalStateCacheKeysForSlot(slot);
+    for (const key of keys) {
+      const slice = await MAIN_IDB_STORE.get<GlobalState>(key);
+      if (slice) return slice;
+    }
+  } catch {
+    // Fall through to localStorage snapshots
+  }
+  return readLocalStorageGlobal(slot);
+}
+
+export async function loadOtherAccountSlices(liveId: string) {
+  const slots = new Set(listChatHubAccountSlots());
+
+  try {
+    const keys = await MAIN_IDB_STORE.keys();
+    keys.forEach((key) => {
+      if (typeof key !== 'string') return;
+      const slot = parseGlobalStateCacheSlot(key);
+      if (slot) slots.add(slot);
+    });
+  } catch {
+    // Session slots still load when IndexedDB listing is unavailable
+  }
+
+  const next: Record<string, ChatHubGlobalSlice> = {};
+  await Promise.all([...slots].map(async (slot) => {
+    if (String(slot) === liveId) return;
+    const slice = await loadCachedGlobalForSlot(slot);
+    if (slice) {
+      next[String(slot)] = slice;
+    }
+  }));
+  return next;
 }
 
 export function createChatHubStore(options: StoreOptions = {}) {
@@ -559,12 +794,18 @@ export function createChatHubStore(options: StoreOptions = {}) {
     }
     : undefined);
   const stored = readStored(storage);
+  const windowWorkspace = readWindowWorkspace();
+  const persistedWorkspace = stored?.workspace || DEFAULT_STATE.workspace;
   let state: ChatHubState = {
     ...DEFAULT_STATE,
     ...stored,
+    selectedAccountIds: [],
+    selectedFolderKey: undefined,
+    workspace: windowWorkspace || persistedWorkspace,
     settings: {
       ...DEFAULT_CHAT_HUB_SETTINGS,
       ...stored?.settings,
+      viewMode: 'unified',
     },
     searchQuery: '',
     isSettingsOpen: false,
@@ -573,14 +814,25 @@ export function createChatHubStore(options: StoreOptions = {}) {
 
   function persist() {
     if (!storage) return;
+    if (windowWorkspace) {
+      try {
+        sessionStorage.setItem(WINDOW_WORKSPACE_KEY, state.workspace);
+      } catch {
+        // Session storage can be unavailable in private mode
+      }
+    }
     storage.setItem(CHAT_HUB_STORAGE_KEY, JSON.stringify({
-      workspace: state.workspace,
+      workspace: windowWorkspace ? persistedWorkspace : state.workspace,
       filter: state.filter,
       selectedAccountIds: state.selectedAccountIds,
       selectedFolderKey: state.selectedFolderKey,
       settings: state.settings,
       priorityKeys: state.priorityKeys,
     }));
+  }
+
+  if (storage?.getItem(CHAT_HUB_STORAGE_KEY)?.includes(`"hotkey":"${LEGACY_CHAT_HUB_HOTKEY}"`)) {
+    persist();
   }
 
   function setState(patch: Partial<ChatHubState>) {
@@ -598,15 +850,22 @@ export function createChatHubStore(options: StoreOptions = {}) {
       return state;
     },
     openChatHub() {
-      setState({ workspace: 'chathub' });
+      setState({
+        workspace: 'chathub',
+        selectedAccountIds: [],
+        selectedFolderKey: undefined,
+      });
     },
     openTelegram() {
       setState({ workspace: 'telegram', isSettingsOpen: false, searchQuery: '' });
     },
     toggleWorkspace() {
+      const isOpeningChatHub = state.workspace !== 'chathub';
       setState({
-        workspace: state.workspace === 'chathub' ? 'telegram' : 'chathub',
+        workspace: isOpeningChatHub ? 'chathub' : 'telegram',
         isSettingsOpen: false,
+        selectedAccountIds: isOpeningChatHub ? [] : state.selectedAccountIds,
+        selectedFolderKey: isOpeningChatHub ? undefined : state.selectedFolderKey,
       });
     },
     setFilter(filter: ChatHubFilter) {
@@ -644,10 +903,9 @@ export function createChatHubStore(options: StoreOptions = {}) {
       setState({ isSettingsOpen: false });
     },
     patchSettings(patch: Partial<ChatHubSettings>) {
-      const panicHotkey = privacyVault.getPersisted().panicHotkey;
       const nextHotkey = patch.hotkey !== undefined
         ? (
-          isValidChatHubHotkey(patch.hotkey) && patch.hotkey.trim() !== panicHotkey
+          isValidChatHubHotkey(patch.hotkey)
             ? patch.hotkey.trim()
             : state.settings.hotkey
         )
@@ -657,6 +915,7 @@ export function createChatHubStore(options: StoreOptions = {}) {
           ...state.settings,
           ...patch,
           hotkey: nextHotkey,
+          viewMode: 'unified',
         },
       });
     },
@@ -668,6 +927,15 @@ export function createChatHubStore(options: StoreOptions = {}) {
     },
     isPriority(key: string) {
       return state.priorityKeys.includes(key);
+    },
+    selectChat(selectedChatKey?: string) {
+      setState({
+        selectedChatKey,
+        embeddedChat: selectedChatKey ? state.embeddedChat : undefined,
+      });
+    },
+    openHubChat(selectedChatKey: string, embeddedChat?: ChatHubEmbeddedChat) {
+      setState({ selectedChatKey, embeddedChat });
     },
   };
 }
@@ -681,5 +949,6 @@ export const ChatHubAggregator = {
   filterUnifiedChats,
   sortUnifiedChats,
   groupUnifiedChats,
-  applyChatHubPrivacy,
+  listChatHubThreadMessages,
+  listChatHubThreadMessagesForChat,
 };

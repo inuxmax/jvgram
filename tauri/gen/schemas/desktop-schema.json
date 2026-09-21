@@ -2211,6 +2211,24 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the activate_desktop_toast command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-activate-desktop-toast",
+          "markdownDescription": "Enables the activate_desktop_toast command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the close_desktop_toast command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-close-desktop-toast",
+          "markdownDescription": "Enables the close_desktop_toast command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the is_app_window_active command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-is-app-window-active",
+          "markdownDescription": "Enables the is_app_window_active command without any pre-configured scope."
+        },
+        {
           "description": "Enables the mark_title_bar_overlay command without any pre-configured scope.",
           "type": "string",
           "const": "allow-mark-title-bar-overlay",
@@ -2247,6 +2265,30 @@
           "markdownDescription": "Enables the set_window_title command without any pre-configured scope."
         },
         {
+          "description": "Enables the show_desktop_notification command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-show-desktop-notification",
+          "markdownDescription": "Enables the show_desktop_notification command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the activate_desktop_toast command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-activate-desktop-toast",
+          "markdownDescription": "Denies the activate_desktop_toast command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the close_desktop_toast command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-close-desktop-toast",
+          "markdownDescription": "Denies the close_desktop_toast command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the is_app_window_active command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-is-app-window-active",
+          "markdownDescription": "Denies the is_app_window_active command without any pre-configured scope."
+        },
+        {
           "description": "Denies the mark_title_bar_overlay command without any pre-configured scope.",
           "type": "string",
           "const": "deny-mark-title-bar-overlay",
@@ -2281,6 +2323,12 @@
           "type": "string",
           "const": "deny-set-window-title",
           "markdownDescription": "Denies the set_window_title command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the show_desktop_notification command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-show-desktop-notification",
+          "markdownDescription": "Denies the show_desktop_notification command without any pre-configured scope."
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

@@ -41,7 +41,6 @@ import { buildCollectionByKey } from './iteratees';
 import { getTranslationFn } from './localization';
 import * as mediaLoader from './mediaLoader';
 import { oldTranslate } from './oldLangProvider';
-import { privacyVault } from './privacyVault';
 import { debounce } from './schedulers';
 import { getServerTime } from './serverTime';
 
@@ -88,6 +87,9 @@ function checkIfPushSupported() {
 }
 
 export function checkIfNotificationsSupported() {
+  // Desktop shells show native OS toasts instead of the Web Notification API
+  if (IS_TAURI) return true;
+
   // Let's check if the browser supports notifications
   if (!('Notification' in window)) {
     if (DEBUG) {
@@ -151,16 +153,20 @@ function checkIfShouldResubscribe(subscription: PushSubscription | null) {
 
 export async function requestPermission() {
   if (IS_TAURI) {
-    const tauriPlugin = await import('@tauri-apps/plugin-notification');
-    const tauriPermissionGranted = await tauriPlugin.isPermissionGranted();
-
-    if (!tauriPermissionGranted) {
-      const permission = await tauriPlugin.requestPermission();
-
-      return permission === 'granted';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const isGranted = await invoke<boolean>('plugin:notification|is_permission_granted');
+      if (isGranted) return true;
+      const permission = await invoke<string>('plugin:notification|request_permission');
+      return String(permission).toLowerCase() === 'granted';
+    } catch (err) {
+      if (DEBUG) {
+        // eslint-disable-next-line no-console
+        console.warn('[PUSH] Unable to request desktop notification permission', err);
+      }
+      // Packaged desktop toasts do not require a browser permission prompt
+      return true;
     }
-
-    return true;
   }
 
   if (!('Notification' in window)) {
@@ -294,9 +300,6 @@ export async function subscribe() {
 }
 
 function checkIfShouldNotify(chat: ApiChat, message: Partial<ApiMessage>) {
-  if (privacyVault.shouldSuppressNotification(privacyVault.getCurrentAccountId(), chat.id)) {
-    return false;
-  }
   const global = getGlobal();
   const notifyDefaults = selectNotifyDefaults(global);
   const notifyException = getChatNotifyException(global, chat);
@@ -314,6 +317,8 @@ function checkIfShouldNotify(chat: ApiChat, message: Partial<ApiMessage>) {
     || chat.isNotJoined || !chat.isListed || selectIsChatWithSelf(global, chat.id)) {
     return false;
   }
+  // Hidden or unfocused desktop windows are checked asynchronously before showing a toast
+  if (IS_TAURI) return true;
   // On touch devices show notifications when chat is not active
   if (IS_TOUCH_ENV) {
     const {
@@ -336,15 +341,10 @@ function getNotificationContent(chat: ApiChat, message: ApiMessage, reaction?: A
 
   const { isScreenLocked } = global.passcode;
   const isSelf = chat.id === global.currentUserId;
-  const shouldHideHiddenPreview = privacyVault.shouldHideNotificationPreview(
-    privacyVault.getCurrentAccountId(),
-    chat.id,
-  );
 
   let body: string;
   if (
     !isScreenLocked
-    && !shouldHideHiddenPreview
     && getShouldShowMessagePreview(chat, selectNotifyDefaults(global), getChatNotifyException(global, chat))
   ) {
     const senderName = sender ? getMessageSenderName(getTranslationFn(), chat.id, sender) : undefined;
@@ -360,7 +360,7 @@ function getNotificationContent(chat: ApiChat, message: ApiMessage, reaction?: A
     body = getTranslationFn()('NotificationMessageTextHidden');
   }
 
-  let title = isScreenLocked || shouldHideHiddenPreview ? APP_NAME : getChatTitle(oldTranslate, chat, isSelf);
+  let title = isScreenLocked ? APP_NAME : getChatTitle(oldTranslate, chat, isSelf);
 
   if (message.isSilent) {
     title += ' 🔕';
@@ -392,20 +392,121 @@ function getReactionEmoji(reaction: ApiPeerReaction) {
   return emoji || '❤️';
 }
 
+async function isDesktopAppActive() {
+  if (!IS_TAURI) return document.hasFocus();
+  try {
+    return await window.tauri.isAppWindowActive();
+  } catch (err) {
+    if (DEBUG) {
+      // eslint-disable-next-line no-console
+      console.warn('[PUSH] Unable to read desktop window state', err);
+    }
+    return document.hasFocus();
+  }
+}
+
+async function mediaUrlToDataUrl(url?: string) {
+  if (!url) return undefined;
+  if (url.startsWith('data:')) return url;
+
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return await new Promise<string | undefined>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve(typeof reader.result === 'string' ? reader.result : undefined);
+      };
+      reader.onerror = () => resolve(undefined);
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    if (DEBUG) {
+      // eslint-disable-next-line no-console
+      console.warn('[PUSH] Unable to encode notification avatar', err);
+    }
+    return undefined;
+  }
+}
+
+function getDesktopToastTheme(): 'light' | 'dark' {
+  return document.documentElement.classList.contains('theme-light') ? 'light' : 'dark';
+}
+
+async function showNativeDesktopNotification({
+  title,
+  body,
+  chatId,
+  messageId,
+  isCall,
+  shouldPlaySound,
+  soundId,
+  avatarUrl,
+}: {
+  title: string;
+  body: string;
+  chatId?: string;
+  messageId?: number;
+  isCall?: boolean;
+  shouldPlaySound?: boolean;
+  soundId?: string;
+  avatarUrl?: string;
+}) {
+  const theme = getDesktopToastTheme();
+  const avatarDataUrl = await mediaUrlToDataUrl(avatarUrl);
+
+  try {
+    await window.tauri.showDesktopNotification({
+      title,
+      body,
+      chatId,
+      messageId,
+      isCall,
+      theme,
+      avatarDataUrl,
+    });
+  } catch (err) {
+    if (DEBUG) {
+      // eslint-disable-next-line no-console
+      console.warn('[PUSH] Unable to show desktop notification', err);
+    }
+  }
+
+  if (shouldPlaySound) {
+    playNotifySoundDebounced(soundId);
+  }
+}
+
 export async function notifyAboutCall({
   call, user,
 }: {
   call: ApiPhoneCall; user: ApiUser;
 }) {
   const { hasWebNotifications } = selectSettingsKeys(getGlobal());
-  if (document.hasFocus() || !hasWebNotifications) return;
+  if (!hasWebNotifications) return;
+  if (await isDesktopAppActive()) return;
   const areNotificationsSupported = checkIfNotificationsSupported();
   if (!areNotificationsSupported) return;
+
+  const title = oldTranslate('VoipIncoming');
+  const body = getUserFullName(user) || '';
+
+  if (IS_TAURI) {
+    await showNativeDesktopNotification({
+      title,
+      body,
+      isCall: true,
+      shouldPlaySound: true,
+      soundId: `call_${call.id}`,
+      avatarUrl: await getAvatar(user),
+    });
+    return;
+  }
 
   const icon = await getAvatar(user);
 
   const options: NotificationOptions = {
-    body: getUserFullName(user),
+    body,
     icon,
     badge: icon,
     tag: `call_${call.id}`,
@@ -416,7 +517,7 @@ export async function notifyAboutCall({
     options.vibrate = [200, 100, 200];
   }
 
-  const notification = new Notification(oldTranslate('VoipIncoming'), options);
+  const notification = new Notification(title, options);
 
   notification.onclick = () => {
     notification.close();
@@ -441,17 +542,17 @@ export async function notifyAboutMessage({
   const isSilent = topic?.notifySettings.hasSound === undefined ? isChatSilent : !topic.notifySettings.hasSound;
 
   const areNotificationsSupported = checkIfNotificationsSupported();
+  const shouldPlaySound = !isSilent && !message.isSilent && !isReaction;
   if (!hasWebNotifications || !areNotificationsSupported) {
-    if (!isSilent && !message.isSilent && !isReaction && !IS_TAURI) {
-      // Only play sound if web notifications are disabled
+    if (shouldPlaySound) {
       playNotifySoundDebounced(String(message.id) || chat.id);
     }
 
     return;
   }
-  if (!areNotificationsSupported) return;
 
   if (!message.id) return;
+  if (IS_TAURI && await isDesktopAppActive()) return;
 
   const activeReaction = getMessageRecentReaction(message);
   // Do not notify about reactions on messages that are not outgoing
@@ -462,8 +563,6 @@ export async function notifyAboutMessage({
     await loadCustomEmoji(activeReaction.reaction.documentId);
   }
 
-  const icon = await getAvatar(chat);
-
   const {
     title,
     body,
@@ -471,13 +570,12 @@ export async function notifyAboutMessage({
 
   if (checkIfPushSupported()) {
     if (navigator.serviceWorker?.controller) {
-      // notify service worker about new message notification
       navigator.serviceWorker.controller.postMessage({
         type: 'showMessageNotification',
         payload: {
           title,
           body,
-          icon,
+          icon: await getAvatar(chat),
           chatId: chat.id,
           messageId: message.id,
           shouldReplaceHistory: true,
@@ -486,8 +584,19 @@ export async function notifyAboutMessage({
         },
       });
     }
+  } else if (IS_TAURI) {
+    await showNativeDesktopNotification({
+      title,
+      body,
+      chatId: chat.id,
+      messageId: message.id,
+      shouldPlaySound,
+      soundId: String(message.id) || chat.id,
+      avatarUrl: await getAvatar(chat),
+    });
   } else {
     const dispatch = getActions();
+    const icon = await getAvatar(chat);
     const options: NotificationOptions = {
       body,
       icon,
@@ -514,10 +623,8 @@ export async function notifyAboutMessage({
       }
     };
 
-    // Play sound when notification is displayed
     notification.onshow = () => {
-      // TODO Update when reaction badges are implemented
-      if (isSilent || isReaction || message.isSilent || IS_TAURI) return;
+      if (!shouldPlaySound) return;
       playNotifySoundDebounced(String(message.id) || chat.id);
     };
   }

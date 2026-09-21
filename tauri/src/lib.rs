@@ -9,6 +9,7 @@ use uuid::Uuid;
 mod deeplink;
 use deeplink::Deeplink;
 
+mod notifications;
 mod tray;
 mod window;
 use crate::window::{WINDOW_STATES, WindowState};
@@ -105,11 +106,15 @@ pub(crate) fn save_window_url(app: &tauri::AppHandle, window_label: &str) {
 }
 
 pub fn run() {
+  notifications::init_windows_notifications("org.telegram.TelegramAirBeta");
+
   let app = tauri::Builder::default()
     .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
       let active_windows = app.windows();
-      if active_windows.len() >= 1 {
-        let window = active_windows.values().next().unwrap();
+      if let Some((_, window)) = active_windows
+        .iter()
+        .find(|(label, _)| !notifications::is_desktop_toast_window(label))
+      {
         window.set_focus().unwrap_or_default();
       } else {
         open_new_window(app.clone(), BASE_URL.to_string()).unwrap();
@@ -126,9 +131,18 @@ pub fn run() {
 
   let app = app.on_window_event(|window, event| match event {
     tauri::WindowEvent::CloseRequested { api, .. } => {
-      let active_windows = window.app_handle().windows();
+      if notifications::is_desktop_toast_window(window.label()) {
+        return;
+      }
 
-      if active_windows.len() == 1 {
+      let main_windows = window
+        .app_handle()
+        .windows()
+        .into_iter()
+        .filter(|(label, _)| !notifications::is_desktop_toast_window(label))
+        .count();
+
+      if main_windows == 1 {
         // Save current URL before hiding the last window
         save_window_url(&window.app_handle(), window.label());
 
@@ -200,7 +214,11 @@ pub fn run() {
     set_window_title,
     open_new_window_cmd,
     save_current_url,
-    set_menu_translations
+    set_menu_translations,
+    show_desktop_notification,
+    is_app_window_active,
+    activate_desktop_toast,
+    close_desktop_toast
   ]);
 
   app
@@ -275,6 +293,67 @@ fn mark_title_bar_overlay(window: tauri::WebviewWindow, is_overlay: bool, is_mob
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
+fn show_desktop_notification(
+  app: tauri::AppHandle,
+  title: String,
+  body: String,
+  chat_id: Option<String>,
+  message_id: Option<i32>,
+  is_call: Option<bool>,
+  theme: Option<String>,
+  avatar_data_url: Option<String>,
+) -> Result<(), String> {
+  let is_call = is_call.unwrap_or(false);
+  #[cfg(windows)]
+  {
+    let app_for_toast = app.clone();
+    app
+      .run_on_main_thread(move || {
+        if let Err(err) = notifications::show_windows_toast(
+          &app_for_toast,
+          &title,
+          &body,
+          chat_id,
+          message_id,
+          is_call,
+          theme.as_deref().unwrap_or("dark"),
+          avatar_data_url,
+        ) {
+          log::error!("Failed to show Windows notification: {err}");
+        }
+      })
+      .map_err(|err| err.to_string())
+  }
+  #[cfg(not(windows))]
+  {
+    use tauri_plugin_notification::NotificationExt;
+    app
+      .notification()
+      .builder()
+      .title(title)
+      .body(body)
+      .show()
+      .map_err(|err| err.to_string())
+  }
+}
+
+#[tauri::command]
+fn activate_desktop_toast(app: tauri::AppHandle) {
+  notifications::activate_desktop_toast(&app);
+}
+
+#[tauri::command]
+fn close_desktop_toast(app: tauri::AppHandle) {
+  notifications::close_desktop_toast(&app);
+}
+
+#[tauri::command]
+fn is_app_window_active(app: tauri::AppHandle) -> bool {
+  notifications::is_app_window_active(&app)
+}
+
+#[tauri::command]
 fn set_notifications_count(
   window: tauri::WebviewWindow,
   amount: i32,
@@ -334,7 +413,7 @@ pub(crate) fn open_new_window(
     window_label.clone(),
     tauri::WebviewUrl::App(url.to_string().into()),
   )
-  .additional_browser_args("--autoplay-policy=no-user-gesture-required")
+  .additional_browser_args("--autoplay-policy=no-user-gesture-required --disable-features=msWebView2EnableBrowserAcceleratorKeys")
   .fullscreen(false)
   .resizable(true)
   .title(DEFAULT_WINDOW_TITLE)
@@ -389,6 +468,11 @@ pub(crate) fn open_new_window(
   let new_window_builder = new_window_builder.title_bar_style(tauri::TitleBarStyle::Overlay);
   #[cfg(target_os = "macos")]
   let new_window_builder = new_window_builder.title("");
+  #[cfg(target_os = "windows")]
+  let new_window_builder = new_window_builder
+    .decorations(false)
+    .shadow(true)
+    .theme(Some(tauri::Theme::Dark));
 
   let window = new_window_builder.build().map_err(|err| err.to_string())?;
 

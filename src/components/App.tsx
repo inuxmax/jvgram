@@ -13,12 +13,12 @@ import {
   selectActionMessageBg, selectTabState, selectTheme, selectThemeValues,
 } from '../global/selectors';
 import { IS_TAURI } from '../util/browser/globalEnvironment';
-import { IS_INSTALL_PROMPT_SUPPORTED, PLATFORM_ENV } from '../util/browser/windowEnvironment';
+import { IS_INSTALL_PROMPT_SUPPORTED, IS_WINDOWS, PLATFORM_ENV } from '../util/browser/windowEnvironment';
 import buildClassName from '../util/buildClassName';
+import { IS_CHAT_HUB_EMBED } from '../util/chatHub';
 import { setupBeforeInstallPrompt } from '../util/installPrompt';
 import { ACCOUNT_SLOT, getAccountSlotUrl, getFirstLoggedInAccountSlot } from '../util/multiaccount';
 import { hasEncryptedSession } from '../util/passcode';
-import { priorityGoldStore } from '../util/priorityGold';
 import { getInitialLocationHash, parseInitialLocationHash } from '../util/routing';
 import { checkSessionLocked, hasStoredSession } from '../util/sessions';
 import { getActionMessageBg, getWallpaperBaseColor } from '../util/wallpaper';
@@ -39,6 +39,7 @@ import UiLoader from './common/UiLoader';
 import AppInactive from './main/AppInactive';
 import LockScreen from './main/LockScreen.async';
 import Main from './main/Main.async';
+import TauriCaptionBar from './main/TauriCaptionBar';
 // import Test from './test/demo/MessageTextStreamingTest';
 import Transition from './ui/Transition';
 
@@ -85,10 +86,6 @@ const App = ({
     if (IS_INSTALL_PROMPT_SUPPORTED) {
       setupBeforeInstallPrompt();
     }
-  }, []);
-
-  useEffect(() => {
-    return priorityGoldStore.init();
   }, []);
 
   useEffect(() => {
@@ -231,7 +228,17 @@ const App = ({
 
   useLayoutEffect(() => {
     document.body.classList.add(styles.bg);
+    if (IS_TAURI && IS_WINDOWS) {
+      document.body.classList.add('is-tauri', 'is-windows');
+    }
   }, []);
+
+  useLayoutEffect(() => {
+    if (!IS_TAURI) return;
+    void window.tauri.getCurrentWindow().then((tauriWindow) => {
+      void tauriWindow.setTheme(theme === 'dark' ? 'dark' : 'light');
+    });
+  }, [theme]);
 
   useLayoutEffect(() => {
     // Prefer the chosen wallpaper's base color, so the pre-render base matches the
@@ -260,22 +267,27 @@ const App = ({
   }, [getIsInBackgroundLocal]);
 
   return (
-    <UiLoader page={page} isMobile={isMobile}>
-      <Transition
-        name="fade"
-        activeKey={activeKey}
-        shouldCleanup
-        className={buildClassName(
-          'full-height',
-          (activeKey === AppScreens.auth || prevActiveKey === AppScreens.auth) && 'is-auth',
-        )}
-        renderCount={TRANSITION_RENDER_COUNT}
-      >
-        {renderContent}
-      </Transition>
-      {activeKey === AppScreens.auth && isTestServer && <div className="test-server-badge">Test server</div>}
-      <Notifications />
-    </UiLoader>
+    <>
+      {IS_TAURI && IS_WINDOWS && !IS_CHAT_HUB_EMBED && (
+        <TauriCaptionBar withWorkspaceSwitcher={activeKey === AppScreens.main} />
+      )}
+      <UiLoader page={page} isMobile={isMobile}>
+        <Transition
+          name="fade"
+          activeKey={activeKey}
+          shouldCleanup
+          className={buildClassName(
+            'full-height',
+            (activeKey === AppScreens.auth || prevActiveKey === AppScreens.auth) && 'is-auth',
+          )}
+          renderCount={TRANSITION_RENDER_COUNT}
+        >
+          {renderContent}
+        </Transition>
+        {activeKey === AppScreens.auth && isTestServer && <div className="test-server-badge">Test server</div>}
+        <Notifications />
+      </UiLoader>
+    </>
   );
 };
 

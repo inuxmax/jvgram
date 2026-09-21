@@ -3,40 +3,37 @@ import { addCallback } from '../lib/teact/teactn';
 import { getActions, getGlobal } from '../global';
 
 import { MAIN_THREAD_ID } from '../api/types';
+import { LoadMoreDirection } from '../types';
 
-import { ALL_FOLDER_ID, MUTE_INDEFINITE_TIMESTAMP, UNMUTE_TIMESTAMP } from '../config';
 import {
-  applyChatHubAccountPrivacy,
-  applyChatHubFolderPrivacy,
-  applyChatHubPrivacy,
+  ALL_FOLDER_ID,
+  ARCHIVED_FOLDER_ID,
+  MUTE_INDEFINITE_TIMESTAMP,
+  SESSION_ACCOUNT_PREFIX,
+  UNMUTE_TIMESTAMP,
+} from '../config';
+import {
+  buildUnifiedChatKey,
   buildUnifiedChatsFromGlobal,
   buildUnifiedFoldersFromGlobal,
   type ChatHubGlobalSlice,
-  type ChatHubPrivacy,
   chatHubStore,
   filterUnifiedChats,
   getCurrentChatHubAccountId,
   listChatHubAccounts,
-  loadCachedGlobalForSlot,
+  loadOtherAccountSlices,
   sortUnifiedChats,
   type UnifiedChat,
 } from '../util/chatHub';
-import { addOrderedIdsCallback } from '../util/folderManager';
-import { getAccountsInfo, getAccountSlotUrl } from '../util/multiaccount';
-import { privacyVault } from '../util/privacyVault';
-import { createLocationHash } from '../util/routing';
+import { addOrderedIdsCallback, getOrderedIds } from '../util/folderManager';
+import { unique } from '../util/iteratees';
+import { ACCOUNTS_CHANGE_EVENT } from '../util/multiaccount';
+import useInterval from './schedulers/useInterval';
 import useForceUpdate from './useForceUpdate';
 import useLang from './useLang';
 import useLastCallback from './useLastCallback';
 
-function readChatHubPrivacy(revision: number): ChatHubPrivacy {
-  return {
-    isVaultUnlocked: privacyVault.isVaultUnlocked(),
-    hiddenAccountIds: privacyVault.getHiddenAccountIds(),
-    hiddenChatsByAccount: {},
-    revision,
-  };
-}
+const OTHER_ACCOUNT_REFRESH_MS = 30000;
 
 export function useChatHubWorkspace() {
   const forceUpdate = useForceUpdate();
@@ -46,6 +43,7 @@ export function useChatHubWorkspace() {
   return {
     workspace: state.workspace,
     settings: state.settings,
+    embeddedChat: state.embeddedChat,
     toggleWorkspace: chatHubStore.toggleWorkspace,
     openChatHub: chatHubStore.openChatHub,
     openTelegram: chatHubStore.openTelegram,
@@ -56,11 +54,32 @@ export default function useChatHub() {
   const lang = useLang();
   const forceUpdate = useForceUpdate();
   const [otherSlices, setOtherSlices] = useState<Record<string, ChatHubGlobalSlice>>({});
+  const [sessionAccounts, setSessionAccounts] = useState(listChatHubAccounts);
   const state = chatHubStore.getState();
+  const isChatHubOpen = state.workspace === 'chathub';
+  const connectionState = getGlobal().connectionState;
+  const liveOrderedIds = getOrderedIds(ALL_FOLDER_ID);
+  const archivedOrderedIds = getOrderedIds(ARCHIVED_FOLDER_ID);
+
+  const reloadOtherSlices = useLastCallback(() => {
+    const liveId = getCurrentChatHubAccountId();
+    void loadOtherAccountSlices(liveId).then(setOtherSlices);
+  });
+
+  const bumpAccounts = useLastCallback(() => {
+    setSessionAccounts(listChatHubAccounts());
+    reloadOtherSlices();
+  });
 
   useEffect(() => chatHubStore.subscribe(forceUpdate), [forceUpdate]);
-  useEffect(() => privacyVault.subscribe(forceUpdate), [forceUpdate]);
-  useEffect(() => addOrderedIdsCallback(ALL_FOLDER_ID, forceUpdate), [forceUpdate]);
+  useEffect(() => {
+    const unsubAll = addOrderedIdsCallback(ALL_FOLDER_ID, forceUpdate);
+    const unsubArchived = addOrderedIdsCallback(ARCHIVED_FOLDER_ID, forceUpdate);
+    return () => {
+      unsubAll();
+      unsubArchived();
+    };
+  }, [forceUpdate]);
   useEffect(() => {
     let frame: number | undefined;
     const handleUpdate = () => {
@@ -74,52 +93,57 @@ export default function useChatHub() {
   }, [forceUpdate]);
 
   useEffect(() => {
-    if (state.workspace !== 'chathub') {
+    if (!isChatHubOpen) {
       return undefined;
     }
 
-    let cancelled = false;
-    const liveId = getCurrentChatHubAccountId();
-    const slots = listChatHubAccounts()
-      .map((account) => Number(account.accountId))
-      .filter((slot) => String(slot) !== liveId);
+    bumpAccounts();
 
-    void Promise.all(slots.map(async (slot) => {
-      const slice = await loadCachedGlobalForSlot(slot);
-      return [String(slot), slice] as const;
-    })).then((entries) => {
-      if (cancelled) return;
-      const next: Record<string, ChatHubGlobalSlice> = {};
-      entries.forEach(([accountId, slice]) => {
-        if (slice) {
-          next[accountId] = slice;
-        }
-      });
-      setOtherSlices(next);
-    });
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key && !e.key.startsWith(SESSION_ACCOUNT_PREFIX)) return;
+      bumpAccounts();
+    };
+
+    window.addEventListener(ACCOUNTS_CHANGE_EVENT, bumpAccounts);
+    window.addEventListener('storage', handleStorage);
 
     return () => {
-      cancelled = true;
+      window.removeEventListener(ACCOUNTS_CHANGE_EVENT, bumpAccounts);
+      window.removeEventListener('storage', handleStorage);
     };
-  }, [state.workspace]);
+  }, [bumpAccounts, isChatHubOpen]);
 
-  const privacyRevision = privacyVault.getRevision();
+  useInterval(() => {
+    if (document.hidden) return;
+    bumpAccounts();
+  }, isChatHubOpen ? OTHER_ACCOUNT_REFRESH_MS : undefined, true);
 
   const accounts = useMemo(() => {
-    const privacy = readChatHubPrivacy(privacyRevision);
-    const global = getGlobal();
-    return applyChatHubAccountPrivacy(listChatHubAccounts(), privacy).map((account) => ({
-      ...account,
-      isConnecting: account.isLive && (
-        global.connectionState === 'connectionStateConnecting'
-        || global.connectionState === 'connectionStateBroken'
-      ),
-      isOffline: !account.isLive && !otherSlices[account.accountId],
-    }));
-  }, [otherSlices, privacyRevision]);
+    const liveId = getCurrentChatHubAccountId();
+    const byId = new Map(sessionAccounts.map((account) => [account.accountId, account]));
+
+    Object.keys(otherSlices).forEach((accountId) => {
+      if (byId.has(accountId)) return;
+      byId.set(accountId, {
+        accountId,
+        name: `Account ${accountId}`,
+        isLive: accountId === liveId,
+      });
+    });
+
+    return [...byId.values()]
+      .sort((left, right) => Number(left.accountId) - Number(right.accountId))
+      .map((account) => ({
+        ...account,
+        isConnecting: account.isLive && (
+          connectionState === 'connectionStateConnecting'
+          || connectionState === 'connectionStateBroken'
+        ),
+        isOffline: !account.isLive && !otherSlices[account.accountId],
+      }));
+  }, [connectionState, otherSlices, sessionAccounts]);
 
   const folders = useMemo(() => {
-    const privacy = readChatHubPrivacy(privacyRevision);
     const liveId = getCurrentChatHubAccountId();
     const liveAccount = accounts.find((account) => account.accountId === liveId);
     const liveFolders = liveAccount
@@ -131,11 +155,10 @@ export default function useChatHub() {
       if (!slice) return [];
       return buildUnifiedFoldersFromGlobal(slice, account.accountId, account.name);
     });
-    return applyChatHubFolderPrivacy([...liveFolders, ...otherFolders], privacy);
-  }, [accounts, otherSlices, privacyRevision]);
+    return [...liveFolders, ...otherFolders];
+  }, [accounts, otherSlices]);
 
-  const chats = useMemo(() => {
-    const privacy = readChatHubPrivacy(privacyRevision);
+  const allChats = useMemo(() => {
     const liveId = getCurrentChatHubAccountId();
     const savedTitle = lang('SavedMessages');
     const liveAccount = accounts.find((account) => account.accountId === liveId);
@@ -147,6 +170,10 @@ export default function useChatHub() {
         accountAvatarUri: liveAccount.avatarUri,
         isLive: true,
         savedTitle,
+        extraChatIds: unique([
+          ...(liveOrderedIds || []),
+          ...(archivedOrderedIds || []),
+        ]),
       })
       : [];
     const otherChats = accounts.flatMap((account) => {
@@ -163,25 +190,20 @@ export default function useChatHub() {
       });
     });
 
-    const visible = applyChatHubPrivacy(
-      [...liveChats, ...otherChats],
-      privacy,
-      (accountId) => privacyVault.getHiddenChatIds(accountId),
-    );
+    return sortUnifiedChats([...liveChats, ...otherChats]);
+  }, [accounts, archivedOrderedIds, lang, liveOrderedIds, otherSlices]);
 
-    return sortUnifiedChats(filterUnifiedChats(visible, {
+  const chats = useMemo(() => {
+    return filterUnifiedChats(allChats, {
       filter: state.filter,
       selectedAccountIds: state.selectedAccountIds,
       selectedFolderKey: state.selectedFolderKey,
       searchQuery: state.searchQuery,
       settings: state.settings,
       priorityKeys: state.priorityKeys,
-    }));
+    });
   }, [
-    accounts,
-    lang,
-    otherSlices,
-    privacyRevision,
+    allChats,
     state.filter,
     state.priorityKeys,
     state.searchQuery,
@@ -190,34 +212,79 @@ export default function useChatHub() {
     state.settings,
   ]);
 
-  const openChat = useLastCallback((chat: UnifiedChat) => {
-    chatHubStore.openTelegram();
-    const currentSlot = Number(getCurrentChatHubAccountId());
-    const targetSlot = Number(chat.accountId);
-    if (targetSlot === currentSlot) {
-      getActions().openChat({ id: chat.chatId, shouldReplaceHistory: true });
+  const selectedChat = allChats.find((chat) => chat.key === state.selectedChatKey);
+
+  const openLiveChat = useLastCallback((chatId: string) => {
+    const { openChat, openForumPanel, loadViewportMessages } = getActions();
+    const liveChat = getGlobal().chats.byId[chatId];
+    if (liveChat?.isForum && !liveChat.isForumAsMessages) {
+      openForumPanel({ chatId });
+      return;
+    }
+    openChat({ id: chatId, shouldReplaceHistory: true });
+    loadViewportMessages({
+      chatId,
+      threadId: MAIN_THREAD_ID,
+      direction: LoadMoreDirection.Around,
+    });
+  });
+
+  const openLivePeer = useLastCallback((chat: UnifiedChat) => {
+    const liveKey = buildUnifiedChatKey(getCurrentChatHubAccountId(), chat.chatId);
+    chatHubStore.openHubChat(liveKey);
+    openLiveChat(chat.chatId);
+  });
+
+  const openEmbeddedChat = useLastCallback((chat: UnifiedChat) => {
+    chatHubStore.openHubChat(chat.key, {
+      accountId: chat.accountId,
+      chatId: chat.chatId,
+    });
+  });
+
+  const openInTelegram = useLastCallback((chat: UnifiedChat) => {
+    if (chat.isLive) {
+      chatHubStore.openHubChat(chat.key);
+      chatHubStore.openTelegram();
+      openLiveChat(chat.chatId);
       return;
     }
 
-    const info = getAccountsInfo()[targetSlot];
-    const url = new URL(getAccountSlotUrl(targetSlot, false, info?.isTest));
-    url.hash = createLocationHash(chat.chatId, 'thread', MAIN_THREAD_ID);
-    window.location.assign(url.toString());
+    openEmbeddedChat(chat);
+  });
+
+  const selectChat = useLastCallback((chat: UnifiedChat, shouldOpen?: boolean) => {
+    if (shouldOpen === false) {
+      chatHubStore.openHubChat(chat.key);
+      return;
+    }
+
+    const liveChat = !chat.isLive ? getGlobal().chats.byId[chat.chatId] : undefined;
+    if (liveChat && (chat.type === 'group' || chat.type === 'channel')) {
+      openLivePeer(chat);
+      return;
+    }
+
+    if (!chat.isLive) {
+      openEmbeddedChat(chat);
+      return;
+    }
+
+    chatHubStore.openHubChat(chat.key);
+    openLiveChat(chat.chatId);
+  });
+
+  const closeChat = useLastCallback(() => {
+    chatHubStore.selectChat(undefined);
   });
 
   const markRead = useLastCallback((chat: UnifiedChat) => {
-    if (!chat.isLive) {
-      openChat(chat);
-      return;
-    }
+    if (!chat.isLive) return;
     getActions().markChatMessagesRead({ id: chat.chatId });
   });
 
   const toggleMuted = useLastCallback((chat: UnifiedChat) => {
-    if (!chat.isLive) {
-      openChat(chat);
-      return;
-    }
+    if (!chat.isLive) return;
     getActions().updateChatMutedState({
       chatId: chat.chatId,
       mutedUntil: chat.isMuted ? UNMUTE_TIMESTAMP : MUTE_INDEFINITE_TIMESTAMP,
@@ -225,18 +292,12 @@ export default function useChatHub() {
   });
 
   const togglePinned = useLastCallback((chat: UnifiedChat) => {
-    if (!chat.isLive) {
-      openChat(chat);
-      return;
-    }
+    if (!chat.isLive) return;
     getActions().toggleChatPinned({ id: chat.chatId, folderId: ALL_FOLDER_ID });
   });
 
   const toggleArchived = useLastCallback((chat: UnifiedChat) => {
-    if (!chat.isLive) {
-      openChat(chat);
-      return;
-    }
+    if (!chat.isLive) return;
     getActions().toggleChatArchived({ id: chat.chatId });
   });
 
@@ -244,19 +305,13 @@ export default function useChatHub() {
     chatHubStore.togglePriority(chat.key);
   });
 
-  const hideChat = useLastCallback((chat: UnifiedChat) => {
-    if (privacyVault.hasPin() && !privacyVault.isVaultUnlocked()) {
-      privacyVault.openVault();
-      return;
-    }
-    void privacyVault.hideChat(chat.accountId, chat.chatId);
-  });
-
   return {
     workspace: state.workspace,
     filter: state.filter,
     selectedAccountIds: state.selectedAccountIds,
     selectedFolderKey: state.selectedFolderKey,
+    selectedChatKey: state.selectedChatKey,
+    selectedChat,
     searchQuery: state.searchQuery,
     isSettingsOpen: state.isSettingsOpen,
     settings: state.settings,
@@ -275,13 +330,14 @@ export default function useChatHub() {
     openSettings: chatHubStore.openSettings,
     closeSettings: chatHubStore.closeSettings,
     patchSettings: chatHubStore.patchSettings,
-    openChat,
+    selectChat,
+    closeChat,
+    openInTelegram,
     markRead,
     toggleMuted,
     togglePinned,
     toggleArchived,
     togglePriority,
-    hideChat,
   };
 }
 

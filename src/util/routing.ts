@@ -64,13 +64,41 @@ export const createMessageHashUrl = (chatId: string, type: MessageListType, thre
   return url.href;
 };
 
+function readOpenChatQuery() {
+  try {
+    const chatId = new URLSearchParams(window.location.search).get('chat');
+    return chatId?.match(/^-?\d+$/) ? chatId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function stripOpenChatQuery() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('chat')) return;
+    url.searchParams.delete('chat');
+    window.history.replaceState(undefined, '', `${url.pathname}${url.search}${url.hash}`);
+  } catch {
+    // Query stripping is best-effort
+  }
+}
+
 export function parseInitialLocationHash() {
   if (parsedInitialLocationHash) return parsedInitialLocationHash;
 
   if (isAlreadyParsed) return undefined;
 
   const locationHash = getInitialLocationHash();
-  if (!locationHash) return undefined;
+  const chatQuery = readOpenChatQuery();
+  if (!locationHash) {
+    if (chatQuery) {
+      messageHash = chatQuery;
+      isAlreadyParsed = true;
+      stripOpenChatQuery();
+    }
+    return undefined;
+  }
 
   let parsedHash = locationHash.replace(/^#/, '');
   if (parsedHash.includes('?')) {
@@ -92,6 +120,12 @@ export function parseInitialLocationHash() {
   isAlreadyParsed = true;
   if (!parsedInitialLocationHash) {
     messageHash = parsedHash;
+  }
+  if (!messageHash && chatQuery) {
+    messageHash = chatQuery;
+  }
+  if (chatQuery) {
+    stripOpenChatQuery();
   }
 
   return parsedInitialLocationHash;

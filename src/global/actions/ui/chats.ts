@@ -3,7 +3,6 @@ import type { ActionReturnType, GlobalState } from '../../types';
 import { MAIN_THREAD_ID } from '../../../api/types';
 
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
-import { privacyVault } from '../../../util/privacyVault';
 import { createMessageHashUrl } from '../../../util/routing';
 import { addActionHandler, execAfterActions, getGlobal, setGlobal } from '../../index';
 import {
@@ -44,11 +43,6 @@ addActionHandler('processOpenChatOrThread', (global, actions, payload): ActionRe
     noForumTopicPanel,
     tabId = getCurrentTabId(),
   } = payload;
-
-  if (chatId && privacyVault.shouldBlockOpenChat(chatId)) {
-    privacyVault.openVault();
-    return;
-  }
 
   const currentMessageList = selectCurrentMessageList(global, tabId);
 

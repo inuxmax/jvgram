@@ -108,7 +108,11 @@ fn tray_click_handler(tray: &TrayIcon, event: TrayIconEvent) {
 }
 
 fn handle_icon_click(app: &AppHandle, only_open: bool) {
-  let active_windows = app.windows();
+  let active_windows: Vec<_> = app
+    .windows()
+    .into_iter()
+    .filter(|(label, _)| !crate::notifications::is_desktop_toast_window(label))
+    .collect();
 
   if active_windows.is_empty() {
     // No open windows, restore with last URL.

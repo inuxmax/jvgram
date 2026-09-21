@@ -1,34 +1,73 @@
 import { memo, useEffect } from '../../lib/teact/teact';
+import { getActions } from '../../global';
 
-import { IS_TAURI } from '../../util/browser/globalEnvironment';
-import { IS_MAC_OS } from '../../util/browser/windowEnvironment';
-import buildClassName from '../../util/buildClassName';
+import { LeftColumnContent } from '../../types';
+
+import { selectIsForumPanelOpen } from '../../global/selectors';
 import captureEscKeyListener from '../../util/captureEscKeyListener';
 
+import useSelector from '../../hooks/data/useSelector';
 import useChatHub from '../../hooks/useChatHub';
+import useForumPanelRender from '../../hooks/useForumPanelRender';
+import useLastCallback from '../../hooks/useLastCallback';
 
+import ForumPanel from '../../components/left/main/forum/ForumPanel';
+import NewChatButton from '../../components/left/NewChatButton';
 import ChatHubHeader from './ChatHubHeader';
 import ChatHubSettingsModal from './ChatHubSettingsModal';
-import ChatHubSidebar from './ChatHubSidebar';
 import UnifiedChatList from './UnifiedChatList';
 
 import styles from './ChatHub.module.scss';
 
 const ChatHub = () => {
+  const { openLeftColumnContent, closeForumPanel } = getActions();
   const hub = useChatHub();
+  const isForumPanelOpen = useSelector(selectIsForumPanelOpen);
+  const {
+    shouldRenderForumPanel,
+    handleForumPanelAnimationEnd,
+    handleForumPanelAnimationStart,
+  } = useForumPanelRender(isForumPanelOpen);
 
-  useEffect(() => captureEscKeyListener(hub.openTelegram), [hub.openTelegram]);
+  const handleEsc = useLastCallback(() => {
+    if (isForumPanelOpen) {
+      closeForumPanel();
+      return;
+    }
+    hub.openTelegram();
+  });
+
+  useEffect(() => captureEscKeyListener(handleEsc), [handleEsc]);
+
+  const handleSelectContacts = useLastCallback(() => {
+    openLeftColumnContent({ contentKey: LeftColumnContent.Contacts });
+  });
+
+  const handleSelectNewChannel = useLastCallback(() => {
+    openLeftColumnContent({ contentKey: LeftColumnContent.NewChannelStep1 });
+  });
+
+  const handleSelectNewGroup = useLastCallback(() => {
+    openLeftColumnContent({ contentKey: LeftColumnContent.NewGroupStep1 });
+  });
 
   return (
-    <div className={buildClassName(styles.root, hub.settings.compactMode && styles.compact)}>
-      {IS_TAURI && IS_MAC_OS && (
-        <div className="tauri-drag-region" data-tauri-drag-region />
-      )}
+    <div id="ChatHub" className={styles.root}>
       <ChatHubHeader hub={hub} />
-      <div className={styles.body}>
-        <ChatHubSidebar hub={hub} />
-        <UnifiedChatList hub={hub} />
-      </div>
+      <UnifiedChatList hub={hub} />
+      {shouldRenderForumPanel && (
+        <ForumPanel
+          isOpen={isForumPanelOpen}
+          onOpenAnimationStart={handleForumPanelAnimationStart}
+          onCloseAnimationEnd={handleForumPanelAnimationEnd}
+        />
+      )}
+      <NewChatButton
+        isShown={!isForumPanelOpen}
+        onNewPrivateChat={handleSelectContacts}
+        onNewChannel={handleSelectNewChannel}
+        onNewGroup={handleSelectNewGroup}
+      />
       <ChatHubSettingsModal hub={hub} />
     </div>
   );

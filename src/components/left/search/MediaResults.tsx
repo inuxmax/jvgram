@@ -21,7 +21,6 @@ import { useIntersectionObserver } from '../../../hooks/useIntersectionObserver'
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
-import { useVisibleSearchResultKeys } from '../../../hooks/usePrivacyVault';
 import useAsyncRendering from '../../right/hooks/useAsyncRendering';
 
 import Media from '../../common/Media';
@@ -45,7 +44,7 @@ const MediaResults: FC<OwnProps & StateProps> = ({
   searchQuery,
   isLoading,
   globalMessagesByChatId,
-  foundIds: rawFoundIds,
+  foundIds,
   isChatProtected,
 }) => {
   const {
@@ -53,8 +52,6 @@ const MediaResults: FC<OwnProps & StateProps> = ({
     openMediaViewer,
     focusMessage,
   } = getActions();
-
-  const foundIds = useVisibleSearchResultKeys(rawFoundIds);
   const containerRef = useRef<HTMLDivElement>();
 
   const oldLang = useOldLang();

@@ -1,9 +1,10 @@
 import { useCallback, useEffect } from '../../lib/teact/teact';
 
 import { IS_TAURI } from '../../util/browser/globalEnvironment';
-import { IS_MAC_OS } from '../../util/browser/windowEnvironment';
+import { IS_MAC_OS, IS_WINDOWS } from '../../util/browser/windowEnvironment';
 
 const NO_DRAG_ELEMENTS = 'input, a, button';
+const CAN_DRAG_WINDOW = IS_TAURI && (IS_MAC_OS || IS_WINDOWS);
 
 const useTauriDrag = () => {
   const handleMouseDown = useCallback(async (event: MouseEvent) => {
@@ -22,7 +23,7 @@ const useTauriDrag = () => {
   }, []);
 
   useEffect(() => {
-    if (!(IS_TAURI && IS_MAC_OS)) return undefined;
+    if (!CAN_DRAG_WINDOW) return undefined;
 
     document.addEventListener('mousedown', handleMouseDown);
 

@@ -11,7 +11,6 @@ import useLastCallback from '../../hooks/useLastCallback';
 import Checkbox from '../../components/ui/Checkbox';
 import InputText from '../../components/ui/InputText';
 import Modal from '../../components/ui/Modal';
-import RadioGroup from '../../components/ui/RadioGroup';
 
 import styles from './ChatHub.module.scss';
 
@@ -86,17 +85,6 @@ const ChatHubSettingsModal = ({ hub }: OwnProps) => {
         checked={settings.compactMode}
         onCheck={(isChecked) => hub.patchSettings({ compactMode: isChecked })}
       />
-      <div className={styles.settingsRow}>
-        <RadioGroup
-          name="chatHubViewMode"
-          selected={settings.viewMode}
-          options={[
-            { value: 'unified', label: lang('ChatHubViewUnified') },
-            { value: 'grouped', label: lang('ChatHubViewGrouped') },
-          ]}
-          onChange={(value) => hub.patchSettings({ viewMode: value === 'grouped' ? 'grouped' : 'unified' })}
-        />
-      </div>
       <InputText
         className={buildClassName(styles.settingsRow, styles.hotkeyField)}
         label={lang('ChatHubHotkey')}

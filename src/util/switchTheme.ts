@@ -18,8 +18,6 @@ const RGB_VARIABLES = new Set([
   '--color-accent-own',
 ]);
 
-let colorOverlay: Record<string, string> | undefined;
-
 const DISABLE_ANIMATION_CSS = `
 .no-animations #root *,
 .no-animations #root *::before,
@@ -103,39 +101,6 @@ function applyColorAnimationStep(startIndex: number, endIndex: number, interpola
       document.documentElement.style.setProperty(`${property}-rgb`, `${r},${g},${b}`);
     }
   });
-
-  applyColorOverlay();
-}
-
-function applyColorOverlay() {
-  if (!colorOverlay) {
-    return;
-  }
-
-  Object.entries(colorOverlay).forEach(([property, value]) => {
-    document.documentElement.style.setProperty(property, value);
-  });
-
-  const themeColorTag = document.querySelector('meta[name="theme-color"]');
-  const background = colorOverlay['--color-background'];
-  if (themeColorTag && background) {
-    themeColorTag.setAttribute('content', background);
-  }
-}
-
-export function setThemeColorOverlay(overlay?: Record<string, string>) {
-  colorOverlay = overlay;
-  if (overlay) {
-    applyColorOverlay();
-    return;
-  }
-
-  const isDarkTheme = document.documentElement.classList.contains('theme-dark');
-  applyColorAnimationStep(isDarkTheme ? 0 : 1, isDarkTheme ? 1 : 0);
-  const themeColorTag = document.querySelector('meta[name="theme-color"]');
-  if (themeColorTag) {
-    themeColorTag.setAttribute('content', isDarkTheme ? '#212121' : '#fff');
-  }
 }
 
 export default switchTheme;

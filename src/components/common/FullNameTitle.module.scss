@@ -6,6 +6,7 @@
   align-items: center;
 
   .statusTransition {
+    flex-shrink: 0;
     width: var(--_status-size) !important;
     height: var(--_status-size) !important;
   }

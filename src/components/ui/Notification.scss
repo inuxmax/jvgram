@@ -30,7 +30,7 @@
 
   color: #fff;
 
-  background-color: var(--color-toast-background);
+  background-color: var(--color-toast-background, #212121);
   background-size: 1.5rem;
   backdrop-filter: blur(0.5rem);
 

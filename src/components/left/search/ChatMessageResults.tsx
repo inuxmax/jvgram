@@ -13,7 +13,6 @@ import { renderMessageSummary } from '../../common/helpers/renderMessageText';
 
 import useAppLayout from '../../../hooks/useAppLayout';
 import useLang from '../../../hooks/useLang';
-import { useVisibleSearchResultKeys } from '../../../hooks/usePrivacyVault';
 
 import NothingFound from '../../common/NothingFound';
 import Island from '../../gili/layout/Island';
@@ -44,7 +43,7 @@ const runThrottled = throttle((cb) => cb(), 500, true);
 const ChatMessageResults: FC<OwnProps & StateProps> = ({
   searchQuery,
   dateSearchQuery,
-  foundIds: rawFoundIds,
+  foundIds,
   globalMessagesByChatId,
   chatsById,
   fetchingStatus,
@@ -56,7 +55,6 @@ const ChatMessageResults: FC<OwnProps & StateProps> = ({
   const { searchMessagesGlobal, openThread } = getActions();
 
   const lang = useLang();
-  const foundIds = useVisibleSearchResultKeys(rawFoundIds);
   const { isMobile } = useAppLayout();
 
   const handleLoadMore = useCallback(({ direction }: { direction: LoadMoreDirection }) => {

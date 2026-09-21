@@ -5303,7 +5303,7 @@ dependencies = [
 
 [[package]]
 name = "telegram_air"
-version = "2.11.5"
+version = "2.11.6"
 dependencies = [
  "ab_glyph",
  "cocoa",
@@ -5328,6 +5328,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "url",
  "uuid",
+ "windows",
 ]
 
 [[package]]

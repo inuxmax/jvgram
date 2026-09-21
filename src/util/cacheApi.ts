@@ -253,7 +253,9 @@ async function getAccountScopedCacheNames(cacheName: string) {
   if (!cacheApi) return [];
 
   try {
-    return (await cacheApi.keys()).filter((name) => name.startsWith(`${cacheName}_`));
+    return (await cacheApi.keys()).filter((name) => (
+      name === cacheName || name.startsWith(`${cacheName}_`)
+    ));
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn(err);

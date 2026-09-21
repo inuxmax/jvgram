@@ -10,7 +10,6 @@
 @use "common";
 @use "composer-primitives";
 @use "print";
-@use "priorityGold";
 
 html,
 body {
@@ -99,6 +98,34 @@ body.is-ios {
 body.is-tauri {
   --custom-cursor: default;
   --window-controls-width: 5rem;
+}
+
+body.is-tauri.is-windows {
+  --window-controls-width: 0rem;
+  --tauri-caption-height: 2rem;
+}
+
+body.is-tauri.is-windows:not(.is-tauri-fullscreen) {
+  height: 100%;
+  padding-top: var(--tauri-caption-height);
+}
+
+html.chathub-embed {
+  --tauri-caption-height: 0rem;
+
+  #FoldersSidebar,
+  #LeftColumn,
+  #ChatHub {
+    display: none !important;
+  }
+
+  #Main {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.is-tauri.is-windows:not(.is-tauri-fullscreen) {
+    padding-top: 0;
+  }
 }
 
 body.no-page-transitions {

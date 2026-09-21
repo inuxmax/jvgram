@@ -116,7 +116,7 @@ addActionHandler('initMain', (global, actions): ActionReturnType => {
   actions.cleanupExpiredTtlMessages();
 
   const { hasWebNotifications, hasPushNotifications } = selectSettingsKeys(global);
-  if (hasWebNotifications && hasPushNotifications) {
+  if (hasWebNotifications && (hasPushNotifications || IS_TAURI)) {
     // Most of the browsers only show the notifications permission prompt after the first user gesture.
     const events = ['click', 'keypress'];
     const subscribeAfterUserGesture = () => {

@@ -110,6 +110,8 @@ type OwnProps = {
   noCommunityChevron?: boolean;
   isInCommunityPanel?: boolean;
   isFoldersSidebarShown?: boolean;
+  accountLabel?: string;
+  forceIsSelected?: boolean;
   observeIntersection?: ObserveFn;
   onReorderAnimationEnd?: NoneToVoidFunction;
 };
@@ -194,6 +196,7 @@ const Chat = ({
   noCommunityChevron,
   isInCommunityPanel,
   isFoldersSidebarShown,
+  accountLabel,
   onReorderAnimationEnd,
 }: OwnProps & StateProps) => {
   const {
@@ -550,6 +553,9 @@ const Chat = ({
             observeIntersection={observeIntersection}
             withStatusTextColor={isSelected}
           />
+          {Boolean(accountLabel) && (
+            <span className="chat-account-badge">{accountLabel}</span>
+          )}
           {isMuted && !isSavedDialog && <Icon name="muted" />}
           <div className="separator" />
           {lastMessage && (
@@ -670,7 +676,7 @@ const buildCommunitySummariesById = memoized((
 
 export default memo(withGlobal<OwnProps>(
   (global, {
-    chatId, isSavedDialog, isPreview, previewMessageId,
+    chatId, isSavedDialog, isPreview, previewMessageId, forceIsSelected,
   }): Complete<StateProps> => {
     const chat = selectChat(global, chatId);
     const user = selectUser(global, chatId);
@@ -698,10 +704,16 @@ export default memo(withGlobal<OwnProps>(
       threadId: currentThreadId,
       type: currentMessageListType,
     } = selectCurrentMessageList(global) || {};
-    const isSelected = !isPreview && chatId === currentChatId && (isSavedDialog
-      ? chatId === currentThreadId : currentThreadId === MAIN_THREAD_ID);
-    const isSelectedForum = (chat.isForum && chatId === currentChatId)
-      || chatId === selectTabState(global).forumPanelChatId;
+    const isSelected = forceIsSelected ?? (
+      !isPreview && chatId === currentChatId && (isSavedDialog
+        ? chatId === currentThreadId : currentThreadId === MAIN_THREAD_ID)
+    );
+    const isSelectedForum = forceIsSelected === false
+      ? false
+      : (
+        (chat.isForum && chatId === currentChatId)
+        || chatId === selectTabState(global).forumPanelChatId
+      );
 
     const userStatus = selectUserStatus(global, chatId);
     const lastMessageTopic = lastMessage && selectTopicFromMessage(global, lastMessage);

@@ -10,6 +10,11 @@
   width: 100%;
   height: 100%;
   margin: 0 auto;
+
+  :global(body.is-tauri.is-windows:not(.is-tauri-fullscreen)) & {
+    top: var(--tauri-caption-height);
+    height: calc(100% - var(--tauri-caption-height));
+  }
 }
 
 .main {

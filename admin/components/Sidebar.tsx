@@ -10,7 +10,6 @@ import BrandMark from './BrandMark';
 
 const ITEMS = [
   { href: '/dashboard', label: 'Tổng quan', icon: GridIcon },
-  { href: '/features', label: 'Giao diện', icon: ThemeIcon },
   { href: '/ai', label: 'AI', icon: SparkIcon },
   { href: '/translate', label: 'Dịch', icon: TranslateIcon },
   { href: '/quick-replies', label: 'Quick Reply', icon: ReplyIcon },
@@ -144,16 +143,6 @@ function GridIcon() {
       <rect x="13" y="4" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
       <rect x="4" y="13" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
       <rect x="13" y="13" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function ThemeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="7.2" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 4.8v14.4" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 12c3.2 0 7.2-1.6 7.2-7.2" stroke="currentColor" strokeWidth="1.8" />
     </svg>
   );
 }

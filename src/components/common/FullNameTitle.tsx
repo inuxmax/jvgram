@@ -139,6 +139,7 @@ const FullNameTitle = ({
           documentId={botVerificationIconId}
           size={emojiStatusSize}
           loopLimit={!noLoopLimit ? EMOJI_STATUS_LOOP_LIMIT : undefined}
+          forceOnHeavyAnimation
           observeIntersectionForLoading={observeIntersection}
         />
       )}
@@ -178,6 +179,7 @@ const FullNameTitle = ({
                   documentId={emojiStatus.documentId}
                   size={emojiStatusSize}
                   loopLimit={!noLoopLimit ? EMOJI_STATUS_LOOP_LIMIT : undefined}
+                  forceOnHeavyAnimation
                   observeIntersectionForLoading={observeIntersection}
                   onClick={onEmojiStatusClick}
                 />

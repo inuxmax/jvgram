@@ -1,5 +1,7 @@
 import { getActions } from '../../global';
 
+import type { TauriNotificationClickPayload } from '../../types/tauri';
+
 import { DEBUG } from '../../config';
 import { MouseButton } from '../browser/windowEnvironment';
 
@@ -27,6 +29,17 @@ export default function setupTauriListeners() {
 
       getActions().showNotification({
         message: { key: 'NativeDownloadFailed' },
+      });
+    });
+
+    listen<TauriNotificationClickPayload>('notification-clicked', (event) => {
+      const { chatId, messageId, isCall } = event.payload;
+      if (isCall || !chatId || !messageId) return;
+
+      getActions().focusMessage({
+        chatId,
+        messageId,
+        shouldReplaceHistory: true,
       });
     });
   });

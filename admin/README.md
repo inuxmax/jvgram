@@ -24,6 +24,21 @@ Mở http://localhost:3000
 - Các lần sau: chỉ `/login`
 - API health: `GET /api/health`
 
+## Deploy Dokploy
+
+1. Tạo MongoDB trên Dokploy (hoặc Atlas).
+2. Tạo ứng dụng, **Dockerfile path:** `admin/Dockerfile`, **build context:** `admin`.
+3. Env:
+
+```
+MONGODB_URI=mongodb://USER:PASS@mongo-host:27017
+MONGODB_DB=telegram_air_admin
+AUTH_SECRET=chuoi-ngau-nhien-dai-it-nhat-32-ky-tu
+PORT=3000
+```
+
+4. Publish port `3000`. Health check: `GET /api/health`.
+
 JSON API (cookie session sau login):
 
 | Method | Path | Mô tả |

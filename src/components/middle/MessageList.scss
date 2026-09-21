@@ -242,8 +242,7 @@
 
     &.focused,
     &.is-forwarding,
-    &.is-selected,
-    &.has-menu-open {
+    &.is-selected {
       &::before {
         opacity: 0.1;
 
@@ -263,8 +262,7 @@
 
       &.focused,
       &.is-forwarding,
-      &.is-selected,
-      &.has-menu-open {
+      &.is-selected {
         &::before {
           opacity: 0.55;
         }

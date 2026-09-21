@@ -69,7 +69,7 @@ const TabList = ({
   const menuTargetRef = useRef<HTMLElement>();
   const isVerticalLayout = layout === 'vertical';
 
-  useHorizontalScroll(containerRef, isVerticalLayout || !tabs.length, true);
+  useHorizontalScroll(containerRef, isVerticalLayout || !tabs.length, true, true, true);
 
   const updateClipPath = useLastCallback(() => {
     const clipPathContainer = clipPathContainerRef.current;
