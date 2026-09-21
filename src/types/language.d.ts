@@ -2469,6 +2469,9 @@ export interface LangPair {
   'ChatHubAction': undefined;
   'ChatHubOtherMessage': undefined;
   'ChatHubMessageText': undefined;
+  'DesktopUpdate': undefined;
+  'DesktopUpdateBusy': undefined;
+  'DesktopUpdateFailed': undefined;
 }
 
 export interface LangPairWithVariables<V = LangVariable> {
@@ -4219,6 +4222,9 @@ export interface LangPairWithVariables<V = LangVariable> {
   };
   'SettingsLanguageDesc': {
     'language': V;
+  };
+  'AccDesktopUpdate': {
+    'version': V;
   };
 }
 

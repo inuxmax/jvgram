@@ -1,3 +1,5 @@
+import type { DesktopUpdateInfo } from '../../types/tauri';
+
 import { IS_MAC_OS } from '../browser/windowEnvironment';
 
 export default function initTauriApi() {
@@ -49,6 +51,12 @@ export default function initTauriApi() {
     openNewWindow,
     relaunch: () => import('@tauri-apps/plugin-process').then(({ relaunch }) => relaunch()),
     checkUpdate: () => import('@tauri-apps/plugin-updater').then(({ check }) => check()),
+    checkGithubUpdate: () => corePromise.then((core) => (
+      core.invoke<DesktopUpdateInfo | null>('check_github_update')
+    )),
+    installGithubUpdate: (downloadUrl: string) => corePromise.then((core) => (
+      core.invoke<void>('install_github_update', { downloadUrl })
+    )),
     getCurrentWindow: () => import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow()),
     setWindowTitle,
     showDesktopNotification,

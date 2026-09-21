@@ -4,6 +4,7 @@ import { PAGE_TITLE_TAURI } from '../../config';
 import { IS_TAURI } from '../../util/browser/globalEnvironment';
 import { IS_WINDOWS } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
+import { useDesktopUpdate } from '../../util/tauri/desktopUpdate';
 
 import { useChatHubWorkspace } from '../../hooks/useChatHub';
 import useLang from '../../hooks/useLang';
@@ -28,6 +29,7 @@ const TauriCaptionBar = ({ withWorkspaceSwitcher }: OwnProps) => {
   const isFullscreen = useFullscreenStatus();
   const [isMaximized, setIsMaximized] = useState(false);
   const isChatHub = workspace === 'chathub';
+  const { update, isInstalling, install } = useDesktopUpdate();
 
   useLayoutEffect(() => {
     document.body.classList.toggle('is-tauri-fullscreen', isFullscreen);
@@ -120,6 +122,18 @@ const TauriCaptionBar = ({ withWorkspaceSwitcher }: OwnProps) => {
         </div>
       )}
       <div className={styles.dragSpacer} data-tauri-drag-region={true} />
+      {update && (
+        <button
+          type="button"
+          className={buildClassName(styles.update, isInstalling && styles.updateBusy)}
+          aria-label={lang('AccDesktopUpdate', { version: update.version })}
+          disabled={isInstalling}
+          onClick={install}
+        >
+          <Icon name="download" className={styles.switcherIcon} />
+          {lang(isInstalling ? 'DesktopUpdateBusy' : 'DesktopUpdate')}
+        </button>
+      )}
       <div className={styles.controls}>
         <button
           type="button"

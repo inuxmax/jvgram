@@ -13,6 +13,7 @@ import packageJson from './package.json' with { type: 'json' };
 
 const DIR_NAME = dirname(fileURLToPath(import.meta.url));
 const PRODUCTION_URL = 'https://web.telegram.org/a';
+const DEFAULT_ADMIN_API_URL = 'https://maiyeu.net';
 
 const { version: APP_VERSION } = packageJson;
 const BUNDLE_STATS_OUT_DIR = 'bundle-stats';
@@ -184,7 +185,7 @@ export default defineConfig(({ mode }): UserConfig => {
     TG_TELEGRAM_API_ID: telegramApiId,
     TG_TELEGRAM_API_HASH: telegramApiHash,
     TG_TEST_SESSION: env.TEST_SESSION || '',
-    TG_ADMIN_API_URL: appEnv === 'development' ? (env.ADMIN_API_URL || 'http://localhost:3000') : '',
+    TG_ADMIN_API_URL: normalizeAdminApiUrl(env.ADMIN_API_URL || DEFAULT_ADMIN_API_URL),
   });
 
   return {
@@ -289,6 +290,13 @@ function parseBundleReportHook(hook: unknown): BundleReportHook | undefined {
   }
 
   return hook.handler as BundleReportHook;
+}
+
+function normalizeAdminApiUrl(value: string) {
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
 }
 
 function setViteEnv(env: Record<string, string>) {

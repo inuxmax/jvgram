@@ -9,6 +9,7 @@ use uuid::Uuid;
 mod deeplink;
 use deeplink::Deeplink;
 
+mod github_update;
 mod notifications;
 mod tray;
 mod window;
@@ -218,7 +219,9 @@ pub fn run() {
     show_desktop_notification,
     is_app_window_active,
     activate_desktop_toast,
-    close_desktop_toast
+    close_desktop_toast,
+    check_github_update,
+    install_github_update
   ]);
 
   app
@@ -389,6 +392,16 @@ fn set_window_title(window: tauri::WebviewWindow, title: String) {
 #[tauri::command]
 async fn open_new_window_cmd(app: tauri::AppHandle, url: String) -> bool {
   open_new_window(app, url).is_ok()
+}
+
+#[tauri::command]
+async fn check_github_update() -> Result<Option<github_update::GithubUpdate>, String> {
+  github_update::check().await
+}
+
+#[tauri::command]
+async fn install_github_update(app: tauri::AppHandle, download_url: String) -> Result<(), String> {
+  github_update::install(app, download_url).await
 }
 
 #[tauri::command]

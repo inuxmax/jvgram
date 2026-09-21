@@ -3336,3 +3336,7 @@
 "ChatHubAction" = "Service message";
 "ChatHubOtherMessage" = "Message";
 "ChatHubMessageText" = "Message";
+"DesktopUpdate" = "Update";
+"DesktopUpdateBusy" = "Updating...";
+"DesktopUpdateFailed" = "Could not install the update. Try again.";
+"AccDesktopUpdate" = "Download and install version {version}";

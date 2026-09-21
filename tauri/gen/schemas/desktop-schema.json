@@ -2217,10 +2217,22 @@
           "markdownDescription": "Enables the activate_desktop_toast command without any pre-configured scope."
         },
         {
+          "description": "Enables the check_github_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-check-github-update",
+          "markdownDescription": "Enables the check_github_update command without any pre-configured scope."
+        },
+        {
           "description": "Enables the close_desktop_toast command without any pre-configured scope.",
           "type": "string",
           "const": "allow-close-desktop-toast",
           "markdownDescription": "Enables the close_desktop_toast command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the install_github_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-install-github-update",
+          "markdownDescription": "Enables the install_github_update command without any pre-configured scope."
         },
         {
           "description": "Enables the is_app_window_active command without any pre-configured scope.",
@@ -2277,10 +2289,22 @@
           "markdownDescription": "Denies the activate_desktop_toast command without any pre-configured scope."
         },
         {
+          "description": "Denies the check_github_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-check-github-update",
+          "markdownDescription": "Denies the check_github_update command without any pre-configured scope."
+        },
+        {
           "description": "Denies the close_desktop_toast command without any pre-configured scope.",
           "type": "string",
           "const": "deny-close-desktop-toast",
           "markdownDescription": "Denies the close_desktop_toast command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the install_github_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-install-github-update",
+          "markdownDescription": "Denies the install_github_update command without any pre-configured scope."
         },
         {
           "description": "Denies the is_app_window_active command without any pre-configured scope.",

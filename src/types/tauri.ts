@@ -7,6 +7,12 @@ export type TauriNotificationClickPayload = {
   isCall?: boolean;
 };
 
+export type DesktopUpdateInfo = {
+  version: string;
+  notes?: string;
+  downloadUrl: string;
+};
+
 type TauriApi = {
   version: string;
   markTitleBarOverlay: (isOverlay: boolean, isMobile?: boolean) => Promise<void>;
@@ -14,6 +20,8 @@ type TauriApi = {
   openNewWindow: (url: string) => Promise<boolean>;
   relaunch: () => Promise<void>;
   checkUpdate: () => Promise<Update | null>;
+  checkGithubUpdate: () => Promise<DesktopUpdateInfo | null>;
+  installGithubUpdate: (downloadUrl: string) => Promise<void>;
   getCurrentWindow: () => Promise<TauriWindow>;
   setWindowTitle: (title: string) => Promise<void>;
   showDesktopNotification: (options: {
