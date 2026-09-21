@@ -1,14 +1,14 @@
 use std::io::Write;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::Emitter;
 use url::Url;
 
 const PROGRESS_EVENT: &str = "github-update-progress";
 
-const GITHUB_RELEASES_LATEST: &str =
-  "https://api.github.com/repos/inuxmax/telegram-tt/releases/latest";
+const GITHUB_LATEST_RELEASE: &str = "https://github.com/inuxmax/jvgram/releases/latest";
+const GITHUB_DOWNLOAD_PREFIX: &str = "https://github.com/inuxmax/jvgram/releases/download";
 const USER_AGENT: &str = concat!("JVgram/", env!("CARGO_PKG_VERSION"));
 const CHECK_TIMEOUT_SECS: u64 = 20;
 const DOWNLOAD_TIMEOUT_SECS: u64 = 600;
@@ -19,21 +19,6 @@ pub struct GithubUpdate {
   version: String,
   notes: Option<String>,
   download_url: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct GithubRelease {
-  tag_name: String,
-  body: Option<String>,
-  draft: bool,
-  prerelease: bool,
-  assets: Vec<GithubAsset>,
-}
-
-#[derive(Debug, Deserialize)]
-struct GithubAsset {
-  name: String,
-  browser_download_url: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -52,9 +37,7 @@ pub async fn check() -> Result<Option<GithubUpdate>, String> {
     .map_err(|err| err.to_string())?;
 
   let response = client
-    .get(GITHUB_RELEASES_LATEST)
-    .header("Accept", "application/vnd.github+json")
-    .header("X-GitHub-Api-Version", "2022-11-28")
+    .get(GITHUB_LATEST_RELEASE)
     .send()
     .await
     .map_err(|err| err.to_string())?;
@@ -63,28 +46,24 @@ pub async fn check() -> Result<Option<GithubUpdate>, String> {
     return Err(format!("GitHub releases returned {}", response.status()));
   }
 
-  let release = response
-    .json::<GithubRelease>()
-    .await
-    .map_err(|err| err.to_string())?;
-
-  if release.draft || release.prerelease {
-    return Ok(None);
-  }
-
-  let version = normalize_version(&release.tag_name);
+  let final_url = response.url().clone();
+  let tag = match tag_from_release_url(&final_url) {
+    Some(tag) => tag,
+    None => {
+      let html = response.text().await.map_err(|err| err.to_string())?;
+      tag_from_release_html(&html)
+        .ok_or_else(|| format!("Could not read latest tag from {final_url}"))?
+    }
+  };
+  let version = normalize_version(&tag);
   if !is_remote_newer(&version, env!("CARGO_PKG_VERSION")) {
     return Ok(None);
   }
 
-  let Some(download_url) = pick_installer_url(&release.assets) else {
-    return Ok(None);
-  };
-
   Ok(Some(GithubUpdate {
-    version,
-    notes: release.body.filter(|body| !body.trim().is_empty()),
-    download_url,
+    version: version.clone(),
+    notes: None,
+    download_url: format!("{GITHUB_DOWNLOAD_PREFIX}/{tag}/JVgram_{version}_x64-setup.exe"),
   }))
 }
 
@@ -186,14 +165,28 @@ fn spawn_installer(path: &std::path::Path) -> Result<(), String> {
   }
 }
 
-fn pick_installer_url(assets: &[GithubAsset]) -> Option<String> {
-  let setup = assets.iter().find(|asset| {
-    let name = asset.name.to_ascii_lowercase();
-    name.contains("setup") && name.ends_with(".exe")
-  });
-  let exe = assets.iter().find(|asset| asset.name.to_ascii_lowercase().ends_with(".exe"));
+fn tag_from_release_url(url: &Url) -> Option<String> {
+  let mut parts = url.path_segments()?;
+  let _owner = parts.next()?;
+  let _repo = parts.next()?;
+  if parts.next()? != "releases" {
+    return None;
+  }
+  if parts.next()? != "tag" {
+    return None;
+  }
+  parts.next().map(str::to_string)
+}
 
-  setup.or(exe).map(|asset| asset.browser_download_url.clone())
+fn tag_from_release_html(html: &str) -> Option<String> {
+  let marker = "/releases/tag/";
+  let start = html.find(marker)? + marker.len();
+  let rest = html.get(start..)?;
+  let end = rest
+    .find(|ch: char| !(ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-')))
+    .unwrap_or(rest.len());
+  let tag = rest.get(..end)?.trim();
+  if tag.is_empty() { None } else { Some(tag.to_string()) }
 }
 
 fn is_github_asset_url(url: &Url) -> bool {
