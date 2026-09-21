@@ -9,6 +9,7 @@ import {
   DEBUG,
   IS_BETA,
 } from '../../config';
+import { IS_TAURI } from '../../util/browser/globalEnvironment';
 import buildClassName from '../../util/buildClassName';
 
 import useFlag from '../../hooks/useFlag';
@@ -35,8 +36,7 @@ const LeftSideMenuDropdown = ({
   } = getActions();
   const [isBotMenuOpen, markBotMenuOpen, unmarkBotMenuOpen] = useFlag();
   const lang = useLang();
-
-  const versionString = IS_BETA ? `${APP_VERSION} Beta (${APP_REVISION})` : (DEBUG ? APP_REVISION : APP_VERSION);
+  const versionFooter = buildAppVersionFooter();
 
   // Disable dropdown menu RTL animation for resize
   const {
@@ -81,10 +81,21 @@ const LeftSideMenuDropdown = ({
         onSelectSettings={handleSelectSettings}
         onBotMenuOpened={markBotMenuOpen}
         onBotMenuClosed={unmarkBotMenuOpen}
-        footer={`${APP_NAME} ${versionString}`}
+        footer={versionFooter}
       />
     </DropdownMenu>
   );
 };
+
+function buildAppVersionFooter() {
+  const releaseVersion = (IS_TAURI && window.tauri?.version) || APP_VERSION;
+  const labeledVersion = IS_BETA ? `${releaseVersion} Beta` : releaseVersion;
+
+  if (DEBUG || IS_BETA) {
+    return `${APP_NAME} ${labeledVersion} · ${APP_REVISION}`;
+  }
+
+  return `${APP_NAME} ${labeledVersion}`;
+}
 
 export default memo(LeftSideMenuDropdown);
