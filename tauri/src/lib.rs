@@ -65,21 +65,49 @@ pub const WINDOW_MIN_WIDTH: f64 = 360.0;
 pub const WINDOW_MIN_HEIGHT: f64 = 200.0;
 
 pub static LAST_URL: LazyLock<std::sync::Mutex<String>> =
-  LazyLock::new(|| std::sync::Mutex::new(BASE_URL.to_string()));
+  LazyLock::new(|| std::sync::Mutex::new(initial_last_url()));
 
 pub const DEFAULT_WINDOW_TITLE: &str = match std::option_env!("APP_TITLE") {
   Some(title) => title,
-  None => "Telegram Air",
+  None => "JVgram",
 };
+
+const BUNDLED_ENTRY: &str = "index.html";
 
 pub const BASE_URL: &str = if cfg!(debug_assertions) {
   "http://localhost:1234/"
 } else {
   match std::option_env!("BASE_URL") {
     Some(url) => url,
-    None => "http://localhost:1234/",
+    None => BUNDLED_ENTRY,
   }
 };
+
+fn should_load_bundled_frontend() -> bool {
+  if cfg!(debug_assertions) {
+    return false;
+  }
+
+  match option_env!("BASE_URL") {
+    Some(url) => is_loopback_http_url(url),
+    None => true,
+  }
+}
+
+fn is_loopback_http_url(url: &str) -> bool {
+  let Ok(parsed) = Url::parse(url) else {
+    return true;
+  };
+  matches!(parsed.host_str(), Some("localhost" | "127.0.0.1" | "::1"))
+}
+
+fn initial_last_url() -> String {
+  if should_load_bundled_frontend() {
+    BUNDLED_ENTRY.to_string()
+  } else {
+    BASE_URL.to_string()
+  }
+}
 
 pub const WITH_UPDATER: &str = match std::option_env!("WITH_UPDATER") {
   Some(str) => str,
@@ -107,7 +135,7 @@ pub(crate) fn save_window_url(app: &tauri::AppHandle, window_label: &str) {
 }
 
 pub fn run() {
-  notifications::init_windows_notifications("org.telegram.TelegramAirBeta");
+  notifications::init_windows_notifications("org.jvgram.desktop");
 
   let app = tauri::Builder::default()
     .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -418,13 +446,13 @@ pub(crate) fn open_new_window(
   app: tauri::AppHandle,
   url: String,
 ) -> Result<tauri::WebviewWindow, String> {
-  let base_url = Url::parse(BASE_URL).map_err(|err| format!("Invalid base URL: {err}"))?;
-  let url = resolve_app_url(&url, &base_url).ok_or_else(|| format!("Disallowed app URL: {url}"))?;
+  let webview_url = build_webview_url(&url)?;
+  let navigation_base = remote_navigation_base();
   let window_label = Uuid::new_v4().to_string();
   let new_window_builder = tauri::WebviewWindowBuilder::new(
     &app,
     window_label.clone(),
-    tauri::WebviewUrl::App(url.to_string().into()),
+    webview_url,
   )
   .additional_browser_args("--autoplay-policy=no-user-gesture-required --disable-features=msWebView2EnableBrowserAcceleratorKeys")
   .fullscreen(false)
@@ -437,7 +465,7 @@ pub(crate) fn open_new_window(
     "window.tauri = {{ version: '{}' }};",
     env!("CARGO_PKG_VERSION")
   ))
-  .on_navigation(move |url| is_allowed_app_url(url, &base_url))
+  .on_navigation(move |url| is_allowed_app_url(&url, navigation_base.as_ref()))
   .on_download(|window, event| {
     match event {
       #[allow(unused_variables)]
@@ -508,12 +536,75 @@ pub(crate) fn open_new_window(
   Ok(window)
 }
 
+fn build_webview_url(url: &str) -> Result<tauri::WebviewUrl, String> {
+  if should_load_bundled_frontend() {
+    return Ok(tauri::WebviewUrl::App(bundled_entry_path(url).into()));
+  }
+
+  let base_url = Url::parse(BASE_URL).map_err(|err| format!("Invalid base URL: {err}"))?;
+  let resolved = resolve_app_url(url, &base_url).ok_or_else(|| format!("Disallowed app URL: {url}"))?;
+  Ok(tauri::WebviewUrl::External(resolved))
+}
+
+fn bundled_entry_path(url: &str) -> String {
+  if url.starts_with('#') {
+    return format!("{BUNDLED_ENTRY}{url}");
+  }
+
+  if let Ok(parsed) = Url::parse(url) {
+    let query = parsed.query().map(|query| format!("?{query}")).unwrap_or_default();
+    let fragment = parsed.fragment().map(|fragment| format!("#{fragment}")).unwrap_or_default();
+    return format!("{BUNDLED_ENTRY}{query}{fragment}");
+  }
+
+  if url.is_empty() || url == "/" || url == BASE_URL || url == BUNDLED_ENTRY {
+    return BUNDLED_ENTRY.to_string();
+  }
+
+  let trimmed = url.trim_start_matches('/');
+  if trimmed.starts_with(BUNDLED_ENTRY) {
+    return trimmed.to_string();
+  }
+  if trimmed.starts_with('?') || trimmed.starts_with('#') {
+    return format!("{BUNDLED_ENTRY}{trimmed}");
+  }
+
+  BUNDLED_ENTRY.to_string()
+}
+
+fn remote_navigation_base() -> Option<Url> {
+  if should_load_bundled_frontend() {
+    return None;
+  }
+  Url::parse(BASE_URL).ok()
+}
+
 fn resolve_app_url(url: &str, base_url: &Url) -> Option<Url> {
   let url = base_url.join(url).ok()?;
 
-  is_allowed_app_url(&url, base_url).then_some(url)
+  is_allowed_app_url(&url, Some(base_url)).then_some(url)
 }
 
-fn is_allowed_app_url(url: &Url, base_url: &Url) -> bool {
+fn is_allowed_app_url(url: &Url, base_url: Option<&Url>) -> bool {
+  if url.scheme() == "about" || is_tauri_asset_url(url) {
+    return true;
+  }
+
+  let Some(base_url) = base_url else {
+    return false;
+  };
   matches!(url.scheme(), "http" | "https") && url.origin() == base_url.origin()
+}
+
+fn is_tauri_asset_url(url: &Url) -> bool {
+  if url.scheme() == "tauri" {
+    return true;
+  }
+  if !matches!(url.scheme(), "http" | "https") {
+    return false;
+  }
+  let Some(host) = url.host_str() else {
+    return false;
+  };
+  host == "tauri.localhost" || host.ends_with(".localhost")
 }

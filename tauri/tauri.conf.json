@@ -22,7 +22,7 @@
     "active": true,
     "createUpdaterArtifacts": false,
     "category": "SocialNetworking",
-    "copyright": "Telegram Air",
+    "copyright": "JVgram",
     "externalBin": [],
     "icon": [
       "icons/32x32.png",
@@ -53,6 +53,6 @@
       }
     }
   },
-  "identifier": "org.telegram.TelegramAirBeta",
-  "productName": "Telegram Air"
+  "identifier": "org.jvgram.desktop",
+  "productName": "JVgram"
 }

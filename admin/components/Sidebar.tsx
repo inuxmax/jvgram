@@ -85,7 +85,7 @@ export default function Sidebar({ name, email }: Props) {
       <div className="brand">
         <BrandMark />
         <div>
-          <h1>Telegram Air</h1>
+          <h1>JVgram</h1>
           <p>Admin</p>
         </div>
       </div>

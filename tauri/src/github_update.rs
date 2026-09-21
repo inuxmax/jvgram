@@ -5,7 +5,7 @@ use url::Url;
 
 const GITHUB_RELEASES_LATEST: &str =
   "https://api.github.com/repos/inuxmax/telegram-tt/releases/latest";
-const USER_AGENT: &str = concat!("TelegramAir/", env!("CARGO_PKG_VERSION"));
+const USER_AGENT: &str = concat!("JVgram/", env!("CARGO_PKG_VERSION"));
 const CHECK_TIMEOUT_SECS: u64 = 20;
 const DOWNLOAD_TIMEOUT_SECS: u64 = 600;
 
@@ -86,7 +86,7 @@ pub async fn install(app: tauri::AppHandle, download_url: String) -> Result<(), 
     .path_segments()
     .and_then(|segments| segments.last())
     .filter(|name| name.to_ascii_lowercase().ends_with(".exe"))
-    .unwrap_or("Telegram-Air-setup.exe")
+    .unwrap_or("JVgram-setup.exe")
     .to_string();
 
   let client = reqwest::Client::builder()

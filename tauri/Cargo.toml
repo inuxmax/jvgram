@@ -1,7 +1,7 @@
  [package]
 name = "telegram_air"
-version = "2.11.7"
-description = "Telegram Air"
+version = "2.11.8"
+description = "JVgram"
 authors = ["Alexander Zinchuk"]
 license = "GPLv3"
 repository = "https://github.com/Ajaxy/telegram-tt"

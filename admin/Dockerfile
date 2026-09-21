@@ -1,4 +1,4 @@
-# Telegram Air Admin — Dokploy
+# JVgram Admin — Dokploy
 # Build context: admin/
 # Env: MONGODB_URI, MONGODB_DB, AUTH_SECRET
 

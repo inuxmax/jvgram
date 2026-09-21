@@ -12,8 +12,8 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: 'Telegram Air Admin',
-  description: 'Admin panel for Telegram Air extras',
+  title: 'JVgram Admin',
+  description: 'Admin panel for JVgram extras',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

@@ -135,7 +135,7 @@ export async function upsertTelegramLogin(input: {
         owner,
         status: 'active',
         source: 'telegram',
-        note: 'Đăng nhập từ Telegram Air',
+        note: 'Đăng nhập từ JVgram',
         lastSeenAt: new Date(),
       },
       $setOnInsert: {
@@ -196,7 +196,7 @@ export async function removeUpgrade(id: string) {
 const DEFAULT_AI: AiSettings = {
   providerUrl: 'https://api.openai.com/v1',
   model: 'gpt-4.1-mini',
-  systemPrompt: 'You are the Telegram Air admin assistant.',
+  systemPrompt: 'You are the JVgram admin assistant.',
 };
 
 export async function getAiSettings(): Promise<AiSettings> {

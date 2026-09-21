@@ -26,7 +26,7 @@ export default async function TranslatePage({
       <header className="page-header">
         <h1 className="page-title">Dịch</h1>
         <p className="page-sub">
-          Bật/tắt từng nhà cung cấp và điền key riêng. Telegram Air chỉ dùng các nhà cung cấp đang bật.
+          Bật/tắt từng nhà cung cấp và điền key riêng. JVgram chỉ dùng các nhà cung cấp đang bật.
         </p>
       </header>
       {saved && <p className="alert alert-ok">Đã lưu cấu hình dịch.</p>}

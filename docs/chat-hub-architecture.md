@@ -1,6 +1,6 @@
 # ChatHub workspace
 
-ChatHub is a separate application workspace inside the same Telegram Air / Tauri window. It is not a Telegram folder, filter, tab, modal, or overlay-on-the-chat-list. Telegram Web A stays the source of truth for chats, messages, media, and sessions.
+ChatHub is a separate application workspace inside the same JVgram / Tauri window. It is not a Telegram folder, filter, tab, modal, or overlay-on-the-chat-list. Telegram Web A stays the source of truth for chats, messages, media, and sessions.
 
 ## Workspace architecture
 

@@ -36,7 +36,7 @@ export default async function SetupPage({
         <div className="brand">
           <BrandMark />
           <div>
-            <h1>Telegram Air</h1>
+            <h1>JVgram</h1>
             <p>Tạo tài khoản admin</p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-# Telegram Air Admin
+# JVgram Admin
 
 Next.js + MongoDB trên **một cổng 3000**. Người đăng ký đầu tiên là admin; sau đó không còn đăng ký.
 
@@ -49,6 +49,6 @@ JSON API (cookie session sau login):
 | POST | `/api/auth/logout` | Đăng xuất |
 | GET/POST/DELETE | `/api/usernames` | Quản lý username |
 | GET/POST/PATCH/DELETE | `/api/upgrades` | Gói nâng cấp |
-| POST | `/api/telegram/login` | Telegram Air gửi user khi đăng nhập |
+| POST | `/api/telegram/login` | JVgram gửi user khi đăng nhập |
 
 Từ root repo: `npm run admin:dev`

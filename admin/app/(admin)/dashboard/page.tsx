@@ -17,7 +17,7 @@ export default async function DashboardPage() {
     <>
       <header className="page-header">
         <h1 className="page-title">Tổng quan</h1>
-        <p className="page-sub">Theo dõi nhanh cấu hình Telegram Air và các mục đang quản lý.</p>
+        <p className="page-sub">Theo dõi nhanh cấu hình JVgram và các mục đang quản lý.</p>
       </header>
       <div className="cards">
         <div className="stat">

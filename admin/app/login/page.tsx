@@ -36,7 +36,7 @@ export default async function LoginPage({
         <div className="brand">
           <BrandMark />
           <div>
-            <h1>Telegram Air</h1>
+            <h1>JVgram</h1>
             <p>Đăng nhập admin</p>
           </div>
         </div>

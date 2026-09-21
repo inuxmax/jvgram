@@ -87,7 +87,7 @@ pub fn activate_desktop_toast(app: &AppHandle) {
 pub fn init_windows_notifications(app_id: &str) {
   set_current_aumid(app_id);
   if let Err(err) = register_start_menu_shortcut(app_id) {
-    log::warn!("Failed to register Telegram Air toast identity: {err:?}");
+    log::warn!("Failed to register JVgram toast identity: {err:?}");
   }
 }
 

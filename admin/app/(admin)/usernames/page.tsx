@@ -14,7 +14,7 @@ export default async function UsernamesPage({
       <header className="page-header">
         <h1 className="page-title">Username</h1>
         <p className="page-sub">
-          User đăng nhập Telegram Air sẽ hiện ở đây. Có thể thêm tay username reserved / premium.
+          User đăng nhập JVgram sẽ hiện ở đây. Có thể thêm tay username reserved / premium.
         </p>
       </header>
       {error && <p className="alert alert-error">Không lưu được username.</p>}

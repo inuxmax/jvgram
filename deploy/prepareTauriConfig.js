@@ -8,7 +8,7 @@ export default function prepareTauriConfig() {
     bundle: {
       windows: {},
     },
-    identifier: 'org.telegram.TelegramAir',
+    identifier: 'org.jvgram.desktop',
   };
 
   if (process.env.WITH_UPDATER === 'true') {
