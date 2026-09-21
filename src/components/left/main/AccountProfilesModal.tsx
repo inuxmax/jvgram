@@ -14,12 +14,14 @@ import {
   parseAccountsBackup,
 } from '../../../util/accountBackup';
 import { closeAccountProfiles } from '../../../util/accountProfilesUi';
+import { IS_TAURI } from '../../../util/browser/globalEnvironment';
 import { IS_SAFARI } from '../../../util/browser/windowEnvironment';
 import {
   ACCOUNT_SLOT,
   getAccountDisplayName,
   getAccountSlotUrl,
   getNextFreeAccountSlot,
+  navigateToAccountSlotUrl,
   storeAccountData,
 } from '../../../util/multiaccount';
 
@@ -113,13 +115,19 @@ const AccountProfilesModal = ({ currentUser }: StateProps) => {
     setSearchQuery(e.target.value);
   });
 
-  const handleAccountClick = useLastCallback((account: AccountInfo) => {
-    if (account.userId === currentUser?.id) return;
+  const handleAccountClick = useLastCallback((slot: number, account: AccountInfo) => {
+    if (account.userId === currentUser?.id || slot === currentSlot) return;
     if (IS_SAFARI) temporarilySuspendCacheUpdate();
+    navigateToAccountSlotUrl(getAccountSlotUrl(slot, undefined, account.isTest));
   });
 
-  const handleAddAccount = useLastCallback(() => {
+  const handleAddAccount = useLastCallback((e: React.MouseEvent) => {
+    if (!addAccountUrl) return;
     if (IS_SAFARI) temporarilySuspendCacheUpdate();
+    if (!IS_TAURI) return;
+    e.preventDefault();
+    closeAccountProfiles();
+    navigateToAccountSlotUrl(addAccountUrl);
   });
 
   const handleSetKind = useLastCallback((slot: number, profileKind: AccountProfileKind) => {
@@ -250,8 +258,8 @@ const AccountProfilesModal = ({ currentUser }: StateProps) => {
               key={slot}
               className={styles.item}
               multiline
-              href={isCurrent ? undefined : getAccountSlotUrl(slot, undefined, account.isTest)}
-              onClick={isCurrent ? undefined : () => handleAccountClick(account)}
+              href={IS_TAURI || isCurrent ? undefined : getAccountSlotUrl(slot, undefined, account.isTest)}
+              onClick={isCurrent ? undefined : () => handleAccountClick(slot, account)}
               contextActions={buildContextActions(slot, account)}
               withPortalForMenu
               leftElement={(
@@ -284,7 +292,7 @@ const AccountProfilesModal = ({ currentUser }: StateProps) => {
         {addAccountUrl && (
           <Button
             size="smaller"
-            href={addAccountUrl}
+            href={IS_TAURI ? undefined : addAccountUrl}
             onClick={handleAddAccount}
           >
             {lang('AirProfilesAdd')}

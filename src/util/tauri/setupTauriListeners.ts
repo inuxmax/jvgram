@@ -90,11 +90,12 @@ async function openLink(url: string | URL) {
   try {
     const urlObject = url instanceof URL ? url : new URL(url, window.location.href);
     if (window.location.origin === urlObject.origin) {
-      await window.tauri.openNewWindow(urlObject.toString());
-    } else {
-      const shellPlugin = await import('@tauri-apps/plugin-shell');
-      await shellPlugin.open(urlObject.toString());
+      window.location.assign(urlObject.toString());
+      return;
     }
+
+    const shellPlugin = await import('@tauri-apps/plugin-shell');
+    await shellPlugin.open(urlObject.toString());
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('Failed to open link:', url, e);

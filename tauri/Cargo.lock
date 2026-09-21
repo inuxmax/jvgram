@@ -5419,7 +5419,7 @@ dependencies = [
 
 [[package]]
 name = "telegram_air"
-version = "2.11.8"
+version = "2.11.9"
 dependencies = [
  "ab_glyph",
  "cocoa",

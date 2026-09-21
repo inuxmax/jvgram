@@ -7,11 +7,13 @@ import type { AccountInfo, AccountProfileKind, CustomPeer } from '../../../types
 import { MULTIACCOUNT_MAX_SLOTS } from '../../../config';
 import { temporarilySuspendCacheUpdate } from '../../../global/cache';
 import { openAccountProfiles } from '../../../util/accountProfilesUi';
+import { IS_TAURI } from '../../../util/browser/globalEnvironment';
 import { IS_SAFARI } from '../../../util/browser/windowEnvironment';
 import {
   getAccountDisplayName,
   getAccountSlotUrl,
   getNextFreeAccountSlot,
+  navigateToAccountSlotUrl,
 } from '../../../util/multiaccount';
 import { REM } from '../../common/helpers/mediaDimensions';
 
@@ -65,13 +67,15 @@ const AccountMenuItems = ({
     : accountEntries;
   const hiddenCount = Math.max(0, accountEntries.length - visibleAccounts.length);
 
-  const handleAccountClick = useLastCallback((account: AccountInfo) => {
+  const handleAccountClick = useLastCallback((slot: number, account: AccountInfo) => {
     if (account.userId === currentUser.id) {
       onSelectCurrent?.();
       return;
     }
 
     if (IS_SAFARI) temporarilySuspendCacheUpdate();
+    if (!IS_TAURI) return;
+    navigateToAccountSlotUrl(getAccountSlotUrl(slot, undefined, account.isTest));
   });
 
   const handleNewAccountClick = useLastCallback(() => {
@@ -84,6 +88,8 @@ const AccountMenuItems = ({
     }
 
     if (IS_SAFARI) temporarilySuspendCacheUpdate();
+    if (!IS_TAURI) return;
+    navigateToAccountSlotUrl(getAccountSlotUrl(nextSlot, true));
   });
 
   const newAccountUrl = useMemo(() => {
@@ -123,8 +129,10 @@ const AccountMenuItems = ({
                   previewUrl={account.avatarUri}
                 />
               )}
-              onClick={() => handleAccountClick(account)}
-              href={account.userId !== currentUser.id ? getAccountSlotUrl(slot, undefined, account.isTest) : undefined}
+              onClick={() => handleAccountClick(slot, account)}
+              href={IS_TAURI || account.userId === currentUser.id
+                ? undefined
+                : getAccountSlotUrl(slot, undefined, account.isTest)}
             >
               {account.isTest && <span className="account-menu-item-test">T</span>}
               <FullNameTitle peer={mockUser} withEmojiStatus emojiStatusSize={REM} />
@@ -143,7 +151,7 @@ const AccountMenuItems = ({
         <MenuItem
           icon="add"
           rel="noopener"
-          href={newAccountUrl}
+          href={IS_TAURI ? undefined : newAccountUrl}
           onClick={handleNewAccountClick}
         >
           {lang('MenuAddAccount')}

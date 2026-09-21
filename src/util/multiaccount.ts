@@ -130,6 +130,10 @@ export function getAccountSlotUrl(slot: number, forLogin?: boolean, isTest?: boo
   return url.toString();
 }
 
+export function navigateToAccountSlotUrl(url: string) {
+  window.location.assign(url);
+}
+
 export function getNextFreeAccountSlot(accounts = getAccountsInfo()) {
   let slot = 1;
   while (accounts[slot] || loadSlotSession(slot)) {
