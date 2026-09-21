@@ -55,6 +55,7 @@ pub fn show_and_focus_any_window(app: &AppHandle) {
   };
 
   crate::reveal_app_window(app, window);
+}
 
 pub fn is_app_window_active(app: &AppHandle) -> bool {
   app.windows().iter().any(|(label, window)| {
