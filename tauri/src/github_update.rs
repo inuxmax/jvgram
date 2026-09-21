@@ -1,7 +1,11 @@
+use std::io::Write;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 use url::Url;
+
+const PROGRESS_EVENT: &str = "github-update-progress";
 
 const GITHUB_RELEASES_LATEST: &str =
   "https://api.github.com/repos/inuxmax/telegram-tt/releases/latest";
@@ -30,6 +34,14 @@ struct GithubRelease {
 struct GithubAsset {
   name: String,
   browser_download_url: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GithubUpdateProgress {
+  percent: u8,
+  downloaded: u64,
+  total: Option<u64>,
 }
 
 pub async fn check() -> Result<Option<GithubUpdate>, String> {
@@ -105,13 +117,50 @@ pub async fn install(app: tauri::AppHandle, download_url: String) -> Result<(), 
     return Err(format!("Download failed with {}", response.status()));
   }
 
-  let bytes = response.bytes().await.map_err(|err| err.to_string())?;
+  let total = response.content_length();
   let installer_path = std::env::temp_dir().join(file_name);
-  std::fs::write(&installer_path, &bytes).map_err(|err| err.to_string())?;
+  let mut file = std::fs::File::create(&installer_path).map_err(|err| err.to_string())?;
+  let mut downloaded: u64 = 0;
+  let mut last_percent: u8 = 0;
+  let mut response = response;
+
+  emit_progress(&app, 0, 0, total);
+
+  loop {
+    let chunk = response.chunk().await.map_err(|err| err.to_string())?;
+    let Some(chunk) = chunk else { break };
+
+    file.write_all(&chunk).map_err(|err| err.to_string())?;
+    downloaded = downloaded.saturating_add(chunk.len() as u64);
+
+    let percent = match total {
+      Some(total) if total > 0 => ((downloaded.saturating_mul(100)) / total).min(100) as u8,
+      _ => 0,
+    };
+
+    if percent != last_percent {
+      last_percent = percent;
+      emit_progress(&app, percent, downloaded, total);
+    }
+  }
+
+  file.flush().map_err(|err| err.to_string())?;
+  emit_progress(&app, 100, downloaded, total);
 
   spawn_installer(&installer_path)?;
   app.exit(0);
   Ok(())
+}
+
+fn emit_progress(app: &tauri::AppHandle, percent: u8, downloaded: u64, total: Option<u64>) {
+  let _ = app.emit(
+    PROGRESS_EVENT,
+    GithubUpdateProgress {
+      percent,
+      downloaded,
+      total,
+    },
+  );
 }
 
 fn spawn_installer(path: &std::path::Path) -> Result<(), String> {

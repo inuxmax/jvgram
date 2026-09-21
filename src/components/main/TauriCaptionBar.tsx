@@ -29,7 +29,7 @@ const TauriCaptionBar = ({ withWorkspaceSwitcher }: OwnProps) => {
   const isFullscreen = useFullscreenStatus();
   const [isMaximized, setIsMaximized] = useState(false);
   const isChatHub = workspace === 'chathub';
-  const { update, isInstalling, install } = useDesktopUpdate();
+  const { update, isInstalling, progressPercent, install } = useDesktopUpdate();
 
   useLayoutEffect(() => {
     document.body.classList.toggle('is-tauri-fullscreen', isFullscreen);
@@ -126,12 +126,18 @@ const TauriCaptionBar = ({ withWorkspaceSwitcher }: OwnProps) => {
         <button
           type="button"
           className={buildClassName(styles.update, isInstalling && styles.updateBusy)}
-          aria-label={lang('AccDesktopUpdate', { version: update.version })}
+          style={`--update-progress: ${isInstalling ? progressPercent / 100 : 0}`}
+          aria-label={isInstalling
+            ? lang('AccDesktopUpdateProgress', { percent: progressPercent })
+            : lang('AccDesktopUpdate', { version: update.version })}
           disabled={isInstalling}
           onClick={install}
         >
-          <Icon name="download" className={styles.switcherIcon} />
-          {lang(isInstalling ? 'DesktopUpdateBusy' : 'DesktopUpdate')}
+          <span className={styles.updateFill} />
+          <span className={styles.updateContent}>
+            <Icon name="download" className={styles.updateIcon} />
+            {renderUpdateLabel(lang, isInstalling, progressPercent)}
+          </span>
         </button>
       )}
       <div className={styles.controls}>
@@ -163,6 +169,16 @@ const TauriCaptionBar = ({ withWorkspaceSwitcher }: OwnProps) => {
     </div>
   );
 };
+
+function renderUpdateLabel(
+  lang: ReturnType<typeof useLang>,
+  isInstalling: boolean,
+  progressPercent: number,
+) {
+  if (!isInstalling) return lang('DesktopUpdate');
+  if (progressPercent >= 100) return lang('DesktopUpdateInstalling');
+  return lang('DesktopUpdateProgress', { percent: progressPercent });
+}
 
 function renderMinimizeIcon() {
   return (

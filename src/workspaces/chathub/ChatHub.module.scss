@@ -47,6 +47,11 @@
   height: 4.5rem;
 }
 
+.listExtent {
+  pointer-events: none;
+  visibility: hidden;
+}
+
 .groupHeader {
   position: absolute;
   left: 0.5rem;

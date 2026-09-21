@@ -9,10 +9,17 @@ import useLastCallback from '../../hooks/useLastCallback';
 
 export type { DesktopUpdateInfo };
 
+type GithubUpdateProgressPayload = {
+  percent: number;
+  downloaded: number;
+  total?: number;
+};
+
 const CHECK_INTERVAL = 30 * 60 * 1000;
 
 let availableUpdate: DesktopUpdateInfo | undefined;
 let isInstalling = false;
+let downloadPercent = 0;
 let hasStartedWatcher = false;
 const listeners = new Set<NoneToVoidFunction>();
 
@@ -26,6 +33,10 @@ export function getDesktopUpdate() {
 
 export function isDesktopUpdateInstalling() {
   return isInstalling;
+}
+
+export function getDesktopUpdatePercent() {
+  return downloadPercent;
 }
 
 export function subscribeDesktopUpdate(listener: NoneToVoidFunction) {
@@ -54,12 +65,14 @@ export async function installDesktopUpdate() {
   if (!availableUpdate || !install || isInstalling) return;
 
   isInstalling = true;
+  downloadPercent = 0;
   notify();
 
   try {
     await install(availableUpdate.downloadUrl);
   } catch (err) {
     isInstalling = false;
+    downloadPercent = 0;
     notify();
     getActions().showNotification({
       message: { key: 'DesktopUpdateFailed' },
@@ -69,10 +82,28 @@ export async function installDesktopUpdate() {
   }
 }
 
+async function listenForInstallProgress() {
+  if (!IS_TAURI) return;
+
+  try {
+    const { listen } = await import('@tauri-apps/api/event');
+    await listen<GithubUpdateProgressPayload>('github-update-progress', (event) => {
+      const nextPercent = Math.max(0, Math.min(100, Math.round(event.payload.percent)));
+      downloadPercent = nextPercent;
+      isInstalling = true;
+      notify();
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('GitHub update progress listener failed:', err);
+  }
+}
+
 export function ensureDesktopUpdateWatcher() {
   if (!IS_TAURI || hasStartedWatcher) return;
 
   hasStartedWatcher = true;
+  void listenForInstallProgress();
   void checkDesktopUpdate();
   window.setInterval(() => {
     void checkDesktopUpdate();
@@ -82,12 +113,14 @@ export function ensureDesktopUpdateWatcher() {
 export function useDesktopUpdate() {
   const [update, setUpdate] = useState(getDesktopUpdate);
   const [isBusy, setIsBusy] = useState(isDesktopUpdateInstalling);
+  const [progressPercent, setProgressPercent] = useState(getDesktopUpdatePercent);
 
   useEffect(() => {
     ensureDesktopUpdateWatcher();
     return subscribeDesktopUpdate(() => {
       setUpdate(getDesktopUpdate());
       setIsBusy(isDesktopUpdateInstalling());
+      setProgressPercent(getDesktopUpdatePercent());
     });
   }, []);
 
@@ -95,5 +128,5 @@ export function useDesktopUpdate() {
     void installDesktopUpdate();
   });
 
-  return { update, isInstalling: isBusy, install };
+  return { update, isInstalling: isBusy, progressPercent, install };
 }

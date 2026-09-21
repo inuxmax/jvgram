@@ -3338,5 +3338,8 @@
 "ChatHubMessageText" = "Message";
 "DesktopUpdate" = "Update";
 "DesktopUpdateBusy" = "Updating...";
+"DesktopUpdateProgress" = "{percent}%";
+"DesktopUpdateInstalling" = "Installing...";
 "DesktopUpdateFailed" = "Could not install the update. Try again.";
 "AccDesktopUpdate" = "Download and install version {version}";
+"AccDesktopUpdateProgress" = "Downloading update, {percent} percent";

@@ -31,6 +31,7 @@ function selectChatListChatId(global: GlobalState) {
 }
 
 const INTERSECTION_THROTTLE = 200;
+const CHAT_HUB_ROW_SELECTOR = '.chat-hub-row';
 
 const UnifiedChatList = ({ hub }: OwnProps) => {
   const lang = useLang();
@@ -40,8 +41,9 @@ const UnifiedChatList = ({ hub }: OwnProps) => {
   const chats = hub.chats;
   const rowKeys = useMemo(() => chats.map((chat) => chat.key), [chats]);
   const chatsByKey = useMemo(() => new Map(chats.map((chat) => [chat.key, chat])), [chats]);
-  const [viewportIds, getMore] = useInfiniteScroll(undefined, rowKeys, undefined, CHAT_LIST_SLICE);
-  const viewportOffset = viewportIds?.length ? rowKeys.indexOf(viewportIds[0]) : 0;
+  const [viewportIds, getMore, sliceOffset] = useInfiniteScroll(undefined, rowKeys, undefined, CHAT_LIST_SLICE);
+  const rowOffset = viewportIds?.length ? rowKeys.indexOf(viewportIds[0]) : -1;
+  const viewportOffset = rowOffset >= 0 ? rowOffset : (sliceOffset || 0);
   const liveAccountId = getCurrentChatHubAccountId();
   const selectedIndex = chats.findIndex((chat) => (
     hub.selectedChatKey
@@ -82,7 +84,7 @@ const UnifiedChatList = ({ hub }: OwnProps) => {
             isForumPanelOpen && 'forum-panel-open',
           )}
           items={viewportIds}
-          itemSelector=".ListItem"
+          itemSelector={CHAT_HUB_ROW_SELECTOR}
           preloadBackwards={CHAT_LIST_SLICE}
           withAbsolutePositioning
           noFastList
@@ -98,20 +100,32 @@ const UnifiedChatList = ({ hub }: OwnProps) => {
             style={`transform: translate3d(0, ${indicatorTop ?? 0}px, 0)`}
             aria-hidden
           />
+          <div
+            key="chat-hub-extent"
+            className={styles.listExtent}
+            style={`height: ${(viewportOffset + (viewportIds?.length || 0)) * CHAT_HEIGHT_PX}px`}
+            aria-hidden
+          />
           {viewportIds?.map((rowKey, index) => {
             const chat = chatsByKey.get(rowKey);
             const offsetTop = (viewportOffset + index) * CHAT_HEIGHT_PX;
             const rowStyle = `top: ${offsetTop}px; height: ${CHAT_HEIGHT_PX}px`;
 
             if (!chat) {
-              return <div key={`placeholder:${rowKey}`} className={styles.liveChat} style={rowStyle} />;
+              return (
+                <div
+                  key={`placeholder:${rowKey}`}
+                  className={buildClassName(styles.liveChat, 'chat-hub-row')}
+                  style={rowStyle}
+                />
+              );
             }
 
             if (chat.isLive) {
               return (
                 <div
                   key={chat.key}
-                  className={styles.liveChat}
+                  className={buildClassName(styles.liveChat, 'chat-hub-row')}
                   style={rowStyle}
                   onMouseDownCapture={(e) => {
                     if (e.button !== 0) return;
@@ -139,7 +153,7 @@ const UnifiedChatList = ({ hub }: OwnProps) => {
             return (
               <div
                 key={chat.key}
-                className={styles.liveChat}
+                className={buildClassName(styles.liveChat, 'chat-hub-row')}
                 style={rowStyle}
               >
                 <UnifiedChatItem

@@ -2471,6 +2471,7 @@ export interface LangPair {
   'ChatHubMessageText': undefined;
   'DesktopUpdate': undefined;
   'DesktopUpdateBusy': undefined;
+  'DesktopUpdateInstalling': undefined;
   'DesktopUpdateFailed': undefined;
 }
 
@@ -4223,8 +4224,14 @@ export interface LangPairWithVariables<V = LangVariable> {
   'SettingsLanguageDesc': {
     'language': V;
   };
+  'DesktopUpdateProgress': {
+    'percent': V;
+  };
   'AccDesktopUpdate': {
     'version': V;
+  };
+  'AccDesktopUpdateProgress': {
+    'percent': V;
   };
 }
 

@@ -14,6 +14,7 @@ import { useDesktopUpdate } from '../../../util/tauri/desktopUpdate';
 
 import useSelector from '../../../hooks/data/useSelector';
 import useForumPanelRender from '../../../hooks/useForumPanelRender';
+import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
 import useShowTransitionDeprecated from '../../../hooks/useShowTransitionDeprecated';
@@ -70,7 +71,7 @@ const LeftMain: FC<OwnProps> = ({
 }) => {
   const { openLeftColumnContent } = getActions();
   const [isNewChatButtonShown, setIsNewChatButtonShown] = useState(IS_TOUCH_ENV);
-  const { update: desktopUpdate, isInstalling, install } = useDesktopUpdate();
+  const { update: desktopUpdate, isInstalling, progressPercent, install } = useDesktopUpdate();
 
   const {
     shouldRenderForumPanel, handleForumPanelAnimationEnd,
@@ -157,7 +158,12 @@ const LeftMain: FC<OwnProps> = ({
     };
   }, [content]);
 
-  const lang = useOldLang();
+  const oldLang = useOldLang();
+  const lang = useLang();
+
+  const updateLabel = desktopUpdate && isInstalling
+    ? renderDesktopUpdateLabel(lang, progressPercent)
+    : oldLang('lng_update_telegram');
 
   return (
     <div
@@ -215,10 +221,11 @@ const LeftMain: FC<OwnProps> = ({
           fluid
           badge
           className={buildClassName('btn-update', updateButtonClassNames)}
+          style={desktopUpdate && isInstalling ? `--update-progress: ${progressPercent / 100}` : undefined}
           onClick={handleUpdateClick}
-          isLoading={isInstalling}
         >
-          {lang('lng_update_telegram')}
+          <span className="btn-update-fill" />
+          <span className="btn-update-label">{updateLabel}</span>
         </Button>
       )}
       {shouldRenderCommunityPanel && (
@@ -248,5 +255,10 @@ const LeftMain: FC<OwnProps> = ({
     </div>
   );
 };
+
+function renderDesktopUpdateLabel(lang: ReturnType<typeof useLang>, progressPercent: number) {
+  if (progressPercent >= 100) return lang('DesktopUpdateInstalling');
+  return lang('DesktopUpdateProgress', { percent: progressPercent });
+}
 
 export default memo(LeftMain);
