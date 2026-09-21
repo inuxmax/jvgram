@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Telegram Air</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        color: #fff;
+        background: #212121;
+        font-family: "Roboto", "Segoe UI", sans-serif;
+        color-scheme: dark;
+        user-select: none;
+        cursor: pointer;
+      }
+
+      html.theme-light,
+      html.theme-light body {
+        color: #111;
+        background: #fff;
+        color-scheme: light;
+      }
+
+      .card {
+        box-sizing: border-box;
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0.75rem 1rem;
+        border: 0;
+        border-radius: 0;
+        outline: none;
+        color: #fff;
+        background: #212121;
+      }
+
+      html.theme-light .card {
+        color: #111;
+        background: #fff;
+      }
+
+      .avatar {
+        flex-shrink: 0;
+        width: 3rem;
+        height: 3rem;
+        object-fit: cover;
+        border-radius: 50%;
+        background: #3390ec;
+      }
+
+      .avatar.is-hidden {
+        display: none;
+      }
+
+      .fallback {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        border-radius: 50%;
+        color: #fff;
+        background: #3390ec;
+        font-size: 1.125rem;
+        font-weight: 500;
+      }
+
+      .fallback.is-hidden {
+        display: none;
+      }
+
+      .texts {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .title {
+        overflow: hidden;
+        font-size: 0.9375rem;
+        font-weight: 500;
+        line-height: 1.25rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .body {
+        overflow: hidden;
+        margin-top: 0.125rem;
+        font-size: 0.8125rem;
+        line-height: 1.125rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        opacity: 0.72;
+      }
+
+      .app {
+        margin-top: 0.25rem;
+        font-size: 0.6875rem;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        color: #3390ec;
+      }
+    </style>
+  </head>
+  <body class="theme-dark">
+    <div class="card" id="card" role="button">
+      <img class="avatar is-hidden" id="avatar" alt="" />
+      <div class="fallback" id="fallback">A</div>
+      <div class="texts">
+        <div class="title" id="title">Telegram Air</div>
+        <div class="body" id="body"></div>
+        <div class="app" id="app">Telegram Air</div>
+      </div>
+    </div>
+    <script>
+      function invokeCommand(name) {
+        const internals = window.__TAURI_INTERNALS__;
+        if (!internals || typeof internals.invoke !== "function") return;
+        internals.invoke(name).catch(() => {});
+      }
+
+      function initialLetter(value) {
+        const trimmed = String(value || "").trim();
+        return trimmed ? trimmed.charAt(0).toUpperCase() : "A";
+      }
+
+      function applyTheme(theme) {
+        const themeClass = theme === "light" ? "theme-light" : "theme-dark";
+        document.documentElement.className = themeClass;
+        document.body.className = themeClass;
+        const colorScheme = document.querySelector('meta[name="color-scheme"]');
+        if (colorScheme) {
+          colorScheme.setAttribute("content", theme === "light" ? "light" : "dark");
+        }
+      }
+
+      window.renderToast = function renderToast() {
+        const toast = window.__TOAST__ || {};
+        applyTheme(toast.theme);
+
+        document.getElementById("title").textContent = toast.title || toast.appName || "Telegram Air";
+        document.getElementById("body").textContent = toast.body || "";
+        document.getElementById("app").textContent = toast.appName || "Telegram Air";
+        document.getElementById("fallback").textContent = initialLetter(toast.title || toast.appName);
+
+        const avatar = document.getElementById("avatar");
+        const fallback = document.getElementById("fallback");
+        if (toast.avatarDataUrl) {
+          avatar.src = toast.avatarDataUrl;
+          avatar.classList.remove("is-hidden");
+          fallback.classList.add("is-hidden");
+        } else {
+          avatar.removeAttribute("src");
+          avatar.classList.add("is-hidden");
+          fallback.classList.remove("is-hidden");
+        }
+      };
+
+      window.renderToast();
+      document.addEventListener("DOMContentLoaded", window.renderToast);
+
+      let hideTimer = window.setTimeout(() => invokeCommand("close_desktop_toast"), 5000);
+      const card = document.getElementById("card");
+      card.addEventListener("click", () => invokeCommand("activate_desktop_toast"));
+      card.addEventListener("mouseenter", () => window.clearTimeout(hideTimer));
+      card.addEventListener("mouseleave", () => {
+        hideTimer = window.setTimeout(() => invokeCommand("close_desktop_toast"), 2000);
+      });
+    </script>
+  </body>
+</html>
