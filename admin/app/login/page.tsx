@@ -5,6 +5,8 @@ import { loginAdmin } from '@/lib/actions';
 import { getSession } from '@/lib/auth';
 import { countAdmins } from '@/lib/data';
 
+export const dynamic = 'force-dynamic';
+
 const ERRORS: Record<string, string> = {
   invalid: 'Email hoặc mật khẩu không đúng.',
   mongo: 'Không kết nối được. Thử lại sau.',

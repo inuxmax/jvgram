@@ -3,6 +3,9 @@ import { Roboto } from 'next/font/google';
 
 import './globals.css';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const roboto = Roboto({
   subsets: ['latin', 'vietnamese'],
   weight: ['400', '500', '700'],

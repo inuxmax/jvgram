@@ -5,6 +5,8 @@ import { setupAdmin } from '@/lib/actions';
 import { getSession } from '@/lib/auth';
 import { countAdmins } from '@/lib/data';
 
+export const dynamic = 'force-dynamic';
+
 const ERRORS: Record<string, string> = {
   invalid: 'Điền đủ tên, email và mật khẩu tối thiểu 8 ký tự.',
   mongo: 'Không kết nối được. Thử lại sau.',
