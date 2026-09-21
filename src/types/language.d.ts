@@ -4233,6 +4233,9 @@ export interface LangPairWithVariables<V = LangVariable> {
   'AccDesktopUpdateProgress': {
     'percent': V;
   };
+  'AccAppSplash': {
+    'app': V;
+  };
 }
 
 export interface LangPairPlural {

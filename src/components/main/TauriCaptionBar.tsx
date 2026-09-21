@@ -1,14 +1,21 @@
-import { memo, useEffect, useLayoutEffect, useState } from '../../lib/teact/teact';
+import { memo, useEffect, useLayoutEffect, useMemo, useState } from '../../lib/teact/teact';
+
+import type { GlobalState } from '../../global/types';
 
 import { PAGE_TITLE_TAURI } from '../../config';
+import { getUserFullName } from '../../global/helpers';
+import { selectUser } from '../../global/selectors';
 import { IS_TAURI } from '../../util/browser/globalEnvironment';
 import { IS_WINDOWS } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
+import { ACCOUNT_SLOT, getAccountDisplayName } from '../../util/multiaccount';
 import { useDesktopUpdate } from '../../util/tauri/desktopUpdate';
 
+import useSelector from '../../hooks/data/useSelector';
 import { useChatHubWorkspace } from '../../hooks/useChatHub';
 import useLang from '../../hooks/useLang';
 import useLastCallback from '../../hooks/useLastCallback';
+import useMultiaccountInfo from '../../hooks/useMultiaccountInfo';
 import { useFullscreenStatus } from '../../hooks/window/useFullscreen';
 
 import Icon from '../common/icons/Icon';
@@ -23,13 +30,25 @@ type OwnProps = {
 
 const IS_WINDOWS_TAURI = IS_TAURI && IS_WINDOWS;
 
+function selectCurrentUser(global: GlobalState) {
+  return global.currentUserId ? selectUser(global, global.currentUserId) : undefined;
+}
+
 const TauriCaptionBar = ({ withWorkspaceSwitcher }: OwnProps) => {
   const lang = useLang();
   const { workspace, openChatHub, openTelegram } = useChatHubWorkspace();
   const isFullscreen = useFullscreenStatus();
   const [isMaximized, setIsMaximized] = useState(false);
   const isChatHub = workspace === 'chathub';
+  const currentUser = useSelector(selectCurrentUser);
+  const accounts = useMultiaccountInfo(currentUser);
   const { update, isInstalling, progressPercent, install } = useDesktopUpdate();
+  const accountName = useMemo(() => {
+    if (isChatHub) return undefined;
+    const account = accounts[ACCOUNT_SLOT || 1];
+    const labeled = account ? getAccountDisplayName(account) : undefined;
+    return labeled || getUserFullName(currentUser);
+  }, [accounts, currentUser, isChatHub]);
 
   useLayoutEffect(() => {
     document.body.classList.toggle('is-tauri-fullscreen', isFullscreen);
@@ -120,6 +139,9 @@ const TauriCaptionBar = ({ withWorkspaceSwitcher }: OwnProps) => {
             {lang('ChatHubWorkspaceChatHub')}
           </button>
         </div>
+      )}
+      {!isChatHub && Boolean(accountName) && (
+        <span className={styles.accountName} title={accountName}>{accountName}</span>
       )}
       <div className={styles.dragSpacer} data-tauri-drag-region={true} />
       {update && (

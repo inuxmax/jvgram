@@ -136,15 +136,7 @@ fn handle_icon_click(app: &AppHandle, only_open: bool) {
   let Some((_, visible_window)) = visible_window else {
     // No visible window, show and focus the first available window.
     if let Some((_, window)) = active_windows.iter().next() {
-      if let Err(err) = window.unminimize() {
-        log::warn!("Failed to unminimize window: {:?}", err);
-      }
-      if let Err(err) = window.show() {
-        log::error!("Failed to show window: {:?}", err);
-      }
-      if let Err(err) = window.set_focus() {
-        log::error!("Failed to focus window: {:?}", err);
-      }
+      crate::reveal_app_window(&app, window);
 
       // Update icon with notification count
       if let Some(webview_window) = window.get_webview_window(window.label()) {

@@ -3343,3 +3343,4 @@
 "DesktopUpdateFailed" = "Could not install the update. Try again.";
 "AccDesktopUpdate" = "Download and install version {version}";
 "AccDesktopUpdateProgress" = "Downloading update, {percent} percent";
+"AccAppSplash" = "Loading {app}";

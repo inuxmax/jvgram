@@ -8,6 +8,7 @@ import { getChatAvatarHash } from '../../global/helpers/chats'; // Direct import
 import { selectAreFoldersPresent, selectIsRightColumnShown, selectTabState } from '../../global/selectors';
 import { selectSharedSettings } from '../../global/selectors/sharedState';
 import buildClassName from '../../util/buildClassName';
+import { IS_CHAT_HUB_EMBED } from '../../util/chatHub';
 import { preloadImage } from '../../util/files';
 import preloadFonts from '../../util/fonts';
 import { localizationReadyPromise } from '../../util/localization';
@@ -18,6 +19,8 @@ import { pause } from '../../util/schedulers';
 import useEffectOnce from '../../hooks/useEffectOnce';
 import useFlag from '../../hooks/useFlag';
 import useShowTransitionDeprecated from '../../hooks/useShowTransitionDeprecated';
+
+import AppSplash, { hideHtmlAppSplash } from './AppSplash';
 
 import appStyles from '../App.module.scss';
 import styles from './UiLoader.module.scss';
@@ -50,6 +53,7 @@ type StateProps = Pick<TabState, 'uiReadyState' | 'shouldSkipHistoryAnimations'>
 };
 
 const MAX_PRELOAD_DELAY = 700;
+const SPLASH_MIN_DELAY = 1250;
 const SECOND_STATE_DELAY = 1000;
 const AVATARS_TO_PRELOAD = 10;
 
@@ -92,18 +96,29 @@ const preloadTasks = {
     preloadAvatars(),
     preloadImage(spoilerMaskPath),
     preloadImage(starIconPath),
+    preloadImage(telegramLogoPath),
     localizationReadyPromise,
   ]),
   authPhoneNumber: () => Promise.all([
     preloadFonts(),
     preloadImage(telegramLogoPath),
   ]),
-  authCode: () => preloadImage(monkeyPath),
-  authPassword: () => preloadImage(monkeyPath),
-  authQrCode: preloadFonts,
+  authCode: () => Promise.all([
+    preloadImage(monkeyPath),
+    preloadImage(telegramLogoPath),
+  ]),
+  authPassword: () => Promise.all([
+    preloadImage(monkeyPath),
+    preloadImage(telegramLogoPath),
+  ]),
+  authQrCode: () => Promise.all([
+    preloadFonts(),
+    preloadImage(telegramLogoPath),
+  ]),
   lock: () => Promise.all([
     preloadFonts(),
     preloadImage(lockPreviewPath),
+    preloadImage(telegramLogoPath),
   ]),
   inactive: () => {
   },
@@ -120,12 +135,14 @@ const UiLoader = ({
   const { setIsUiReady } = getActions();
 
   const [isReady, markReady] = useFlag();
+  const shouldUseSplash = Boolean(page) && page !== 'inactive' && !IS_CHAT_HUB_EMBED;
   const {
     shouldRender: shouldRenderMask, transitionClassNames,
-  } = useShowTransitionDeprecated(!isReady, undefined, true);
+  } = useShowTransitionDeprecated(!isReady, undefined, true, 'slow', false, 400);
 
   useEffectOnce(() => {
     let timeout: number | undefined;
+    hideHtmlAppSplash();
 
     const safePreload = async (currentPage: UiLoaderPage) => {
       try {
@@ -141,6 +158,7 @@ const UiLoader = ({
         pause(MAX_PRELOAD_DELAY),
         page ? safePreload(page) : Promise.resolve(),
       ]),
+      shouldUseSplash ? pause(SPLASH_MIN_DELAY) : Promise.resolve(),
     ]).then(() => {
       markReady();
       setIsUiReady({ uiReadyState: 1 });
@@ -165,7 +183,9 @@ const UiLoader = ({
       {children}
       {shouldRenderMask && !shouldSkipHistoryAnimations && Boolean(page) && (
         <div className={buildClassName(styles.mask, transitionClassNames)}>
-          {page === 'main' ? (
+          {shouldUseSplash ? (
+            <AppSplash />
+          ) : page === 'main' ? (
             <div className={buildClassName(styles.main, isFoldersSidebarShown && styles.foldersSidebarVisible)}>
               {isFoldersSidebarShown && <div className={styles.foldersSidebar} />}
               <div

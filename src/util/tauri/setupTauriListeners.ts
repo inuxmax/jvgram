@@ -89,10 +89,16 @@ export default function setupTauriListeners() {
 async function openLink(url: string | URL) {
   try {
     const urlObject = url instanceof URL ? url : new URL(url, window.location.href);
+    const hostname = urlObject.hostname;
+    const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+
     if (window.location.origin === urlObject.origin) {
       window.location.assign(urlObject.toString());
       return;
     }
+
+    // Dev-server URLs must stay inside the app, never in Edge
+    if (isLoopback) return;
 
     const shellPlugin = await import('@tauri-apps/plugin-shell');
     await shellPlugin.open(urlObject.toString());

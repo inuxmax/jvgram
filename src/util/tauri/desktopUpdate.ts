@@ -15,10 +15,11 @@ type GithubUpdateProgressPayload = {
   total?: number;
 };
 
-const CHECK_INTERVAL = 30 * 60 * 1000;
+const CHECK_INTERVAL = 30 * 1000;
 
 let availableUpdate: DesktopUpdateInfo | undefined;
 let isInstalling = false;
+let isChecking = false;
 let downloadPercent = 0;
 let hasStartedWatcher = false;
 const listeners = new Set<NoneToVoidFunction>();
@@ -48,8 +49,9 @@ export function subscribeDesktopUpdate(listener: NoneToVoidFunction) {
 
 export async function checkDesktopUpdate() {
   const check = window.tauri?.checkGithubUpdate;
-  if (!IS_TAURI || !check) return;
+  if (!IS_TAURI || !check || isInstalling || isChecking) return;
 
+  isChecking = true;
   try {
     const next = await check();
     availableUpdate = next ?? undefined;
@@ -57,6 +59,8 @@ export async function checkDesktopUpdate() {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('GitHub update check failed:', err);
+  } finally {
+    isChecking = false;
   }
 }
 
@@ -99,6 +103,10 @@ async function listenForInstallProgress() {
   }
 }
 
+function shouldPollDesktopUpdate() {
+  return !document.hidden && !availableUpdate && !isInstalling;
+}
+
 export function ensureDesktopUpdateWatcher() {
   if (!IS_TAURI || hasStartedWatcher) return;
 
@@ -106,8 +114,13 @@ export function ensureDesktopUpdateWatcher() {
   void listenForInstallProgress();
   void checkDesktopUpdate();
   window.setInterval(() => {
+    if (!shouldPollDesktopUpdate()) return;
     void checkDesktopUpdate();
   }, CHECK_INTERVAL);
+  document.addEventListener('visibilitychange', () => {
+    if (!shouldPollDesktopUpdate()) return;
+    void checkDesktopUpdate();
+  });
 }
 
 export function useDesktopUpdate() {

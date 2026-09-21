@@ -1,0 +1,349 @@
+.root {
+  --splash-cyan: #5ec8ff;
+
+  position: relative;
+
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  height: 100%;
+
+  perspective: 56rem;
+  perspective-origin: 50% 42%;
+  background:
+    radial-gradient(ellipse 42rem 28rem at 50% 38%, rgba(43, 158, 217, 0.28) 0%, transparent 62%),
+    radial-gradient(ellipse 18rem 12rem at 50% 44%, rgba(94, 200, 255, 0.16) 0%, transparent 70%),
+    linear-gradient(180deg, #102030 0%, #0b141c 48%, #070b10 100%);
+}
+
+.aura {
+  pointer-events: none;
+
+  position: absolute;
+  top: 32%;
+  left: 50%;
+  transform-origin: 50% 50%;
+  transform: translate(-50%, -50%);
+
+  width: 16rem;
+  height: 16rem;
+
+  opacity: 0.85;
+  background: radial-gradient(circle, rgba(94, 200, 255, 0.34) 0%, transparent 68%);
+}
+
+.stage {
+  position: relative;
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+  transform: rotateX(18deg);
+
+  width: 14rem;
+  height: 14rem;
+  margin-bottom: 1.75rem;
+}
+
+.ring,
+.ringMid,
+.ringInner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+
+  border: 0.1875rem solid rgba(94, 200, 255, 0.42);
+  border-radius: 50%;
+}
+
+.ring {
+  width: 12.5rem;
+  height: 12.5rem;
+  margin: -6.25rem 0 0 -6.25rem;
+  border-color: rgba(94, 200, 255, 0.4);
+
+  animation: appSplashOrbit 7.5s linear infinite;
+}
+
+.ringMid {
+  width: 10rem;
+  height: 10rem;
+  margin: -5rem 0 0 -5rem;
+  border-color: rgba(94, 200, 255, 0.55);
+
+  animation: appSplashOrbitReverse 5.5s linear infinite;
+}
+
+.ringInner {
+  width: 7.5rem;
+  height: 7.5rem;
+  margin: -3.75rem 0 0 -3.75rem;
+  border-color: rgba(255, 255, 255, 0.4);
+  border-style: dashed;
+  border-width: 0.125rem;
+
+  animation: appSplashOrbit 4.25s linear infinite;
+}
+
+.cube {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+
+  width: 5.5rem;
+  height: 5.5rem;
+  margin: -2.75rem 0 0 -2.75rem;
+
+  animation: appSplashCube 8s linear infinite;
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+
+  border: 0.0625rem solid rgba(94, 200, 255, 0.5);
+  border-radius: 0.5rem;
+
+  background: linear-gradient(145deg, rgba(94, 200, 255, 0.22) 0%, rgba(15, 40, 58, 0.1) 100%);
+}
+
+.front {
+  transform-origin: 50% 50%;
+  transform: translateZ(2.75rem);
+}
+
+.back {
+  transform-origin: 50% 50%;
+  transform: rotateY(180deg) translateZ(2.75rem);
+}
+
+.right {
+  transform-origin: 50% 50%;
+  transform: rotateY(90deg) translateZ(2.75rem);
+}
+
+.left {
+  transform-origin: 50% 50%;
+  transform: rotateY(-90deg) translateZ(2.75rem);
+}
+
+.top {
+  transform-origin: 50% 50%;
+  transform: rotateX(90deg) translateZ(2.75rem);
+}
+
+.bottom {
+  transform-origin: 50% 50%;
+  transform: rotateX(-90deg) translateZ(2.75rem);
+}
+
+.sparks {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+
+  animation: appSplashSparks 6s linear infinite;
+}
+
+.spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+
+  width: 0.375rem;
+  height: 0.375rem;
+  margin: -0.1875rem 0 0 -0.1875rem;
+  border-radius: 50%;
+
+  background: var(--splash-cyan);
+}
+
+.logoWrap {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform-origin: 50% 50%;
+
+  width: 4.25rem;
+  height: 4.25rem;
+  margin: -2.125rem 0 0 -2.125rem;
+
+  filter: drop-shadow(0 0.75rem 1.125rem rgba(43, 158, 217, 0.48));
+
+  animation: appSplashLogo 2.6s ease-in-out infinite;
+}
+
+.logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.floor {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform-origin: 50% 50%;
+  transform: rotateX(78deg);
+
+  width: 7.5rem;
+  height: 1.25rem;
+  margin-left: -3.75rem;
+  border-radius: 50%;
+
+  background: rgba(0, 0, 0, 0.38);
+
+  animation: appSplashFloor 2.6s ease-in-out infinite;
+}
+
+.meta {
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.brand {
+  margin-bottom: 0.375rem;
+
+  font-size: 1.375rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.75rem;
+  color: #f4fbff;
+  letter-spacing: 0.08em;
+}
+
+.dots {
+  display: flex;
+  gap: 0.375rem;
+  align-items: flex-end;
+  height: 0.75rem;
+}
+
+.dot {
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border-radius: 50%;
+
+  background: var(--splash-cyan);
+
+  animation: appSplashDot 1.05s ease-in-out infinite;
+}
+
+.dotSecond {
+  animation-delay: 0.15s;
+}
+
+.dotThird {
+  animation-delay: 0.3s;
+}
+
+@keyframes appSplashOrbit {
+  from {
+    transform: rotateX(72deg) rotateZ(0deg);
+  }
+
+  to {
+    transform: rotateX(72deg) rotateZ(360deg);
+  }
+}
+
+@keyframes appSplashOrbitReverse {
+  from {
+    transform: rotateX(66deg) rotateY(28deg) rotateZ(360deg);
+  }
+
+  to {
+    transform: rotateX(66deg) rotateY(28deg) rotateZ(0deg);
+  }
+}
+
+@keyframes appSplashCube {
+  from {
+    transform: rotateX(-18deg) rotateY(0deg);
+  }
+
+  to {
+    transform: rotateX(-18deg) rotateY(360deg);
+  }
+}
+
+@keyframes appSplashSparks {
+  from {
+    transform: rotateY(0deg);
+  }
+
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+@keyframes appSplashLogo {
+  0%,
+  100% {
+    transform: translateY(0) rotateY(-18deg);
+  }
+
+  50% {
+    transform: translateY(-0.5rem) rotateY(18deg);
+  }
+}
+
+@keyframes appSplashFloor {
+  0%,
+  100% {
+    transform: rotateX(78deg) scale(1);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: rotateX(78deg) scale(0.78);
+    opacity: 0.22;
+  }
+}
+
+@keyframes appSplashDot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  40% {
+    transform: translateY(-0.25rem);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring,
+  .ringMid,
+  .ringInner,
+  .cube,
+  .sparks,
+  .logoWrap,
+  .floor,
+  .dot {
+    animation: none;
+  }
+
+  .cube {
+    transform-origin: 50% 50%;
+    transform: rotateX(-16deg) rotateY(-32deg);
+  }
+
+  .logoWrap {
+    transform-origin: 50% 50%;
+    transform: rotateY(-12deg);
+  }
+}

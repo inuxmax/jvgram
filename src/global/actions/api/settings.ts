@@ -15,6 +15,7 @@ import {
 import { toCredentialCreationOptions } from '../../../util/browser/passkeys';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import { buildCollectionByKey } from '../../../util/iteratees';
+import { mergeInterfaceLanguages } from '../../../util/localization/localLanguages';
 import { requestPermission, subscribe, unsubscribe } from '../../../util/notifications';
 import requestActionTimeout from '../../../util/requestActionTimeout';
 import { getServerTime } from '../../../util/serverTime';
@@ -424,12 +425,11 @@ addActionHandler('updateContactSignUpNotification', async (global, actions, payl
 
 addActionHandler('loadLanguages', async (global): Promise<void> => {
   const result = await callApi('fetchLanguages');
-  if (!result) {
-    return;
-  }
 
   global = getGlobal();
-  global = updateSharedSettings(global, { languages: result });
+  global = updateSharedSettings(global, {
+    languages: mergeInterfaceLanguages(result || []),
+  });
   setGlobal(global);
 });
 

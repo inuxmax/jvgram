@@ -109,6 +109,40 @@ fn initial_last_url() -> String {
   }
 }
 
+fn is_external_loopback(url: &Url) -> bool {
+  matches!(url.scheme(), "http" | "https")
+    && matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"))
+}
+
+pub(crate) fn reveal_app_window(app: &tauri::AppHandle, window: &tauri::Window) {
+  let _ = window.show();
+  let _ = window.unminimize();
+  let _ = window.set_focus();
+  reload_window_if_stuck(app, window.label());
+}
+
+fn reload_window_if_stuck(app: &tauri::AppHandle, label: &str) {
+  if !should_load_bundled_frontend() {
+    return;
+  }
+
+  let Some(webview) = app.get_webview_window(label) else {
+    return;
+  };
+
+  let should_reload = match webview.url() {
+    Ok(url) => is_external_loopback(&url),
+    Err(_) => true,
+  };
+  if !should_reload {
+    return;
+  }
+
+  if let Ok(next_url) = Url::parse("https://tauri.localhost/") {
+    let _ = webview.navigate(next_url);
+  }
+}
+
 pub const WITH_UPDATER: &str = match std::option_env!("WITH_UPDATER") {
   Some(str) => str,
   None => "false",
@@ -126,6 +160,9 @@ pub(crate) fn strip_hash_from_url(url: &str) -> String {
 pub(crate) fn save_window_url(app: &tauri::AppHandle, window_label: &str) {
   if let Some(webview_window) = app.get_webview_window(window_label) {
     if let Ok(current_url) = webview_window.url() {
+      if should_load_bundled_frontend() && is_external_loopback(&current_url) {
+        return;
+      }
       let url_without_hash = strip_hash_from_url(current_url.as_str());
       if let Ok(mut last_url) = LAST_URL.lock() {
         *last_url = url_without_hash;
@@ -144,9 +181,9 @@ pub fn run() {
         .iter()
         .find(|(label, _)| !notifications::is_desktop_toast_window(label))
       {
-        window.set_focus().unwrap_or_default();
+        reveal_app_window(app, window);
       } else {
-        open_new_window(app.clone(), BASE_URL.to_string()).unwrap();
+        open_new_window(app.clone(), initial_last_url()).unwrap();
       }
     }))
     .plugin(tauri_plugin_os::init())
@@ -218,7 +255,7 @@ pub fn run() {
     // Manage app state
     app.manage(AppState::new(AppStateStruct::default()));
 
-    let _main_window = open_new_window(app.handle().clone(), BASE_URL.to_string())
+    let _main_window = open_new_window(app.handle().clone(), initial_last_url())
       .expect("Failed to open main window");
 
     let deeplink = Deeplink::init();
@@ -435,6 +472,9 @@ async fn install_github_update(app: tauri::AppHandle, download_url: String) -> R
 #[tauri::command]
 fn save_current_url(window: tauri::WebviewWindow) {
   if let Ok(current_url) = window.url() {
+    if should_load_bundled_frontend() && is_external_loopback(&current_url) {
+      return;
+    }
     let url_without_hash = strip_hash_from_url(current_url.as_str());
     if let Ok(mut last_url) = LAST_URL.lock() {
       *last_url = url_without_hash;

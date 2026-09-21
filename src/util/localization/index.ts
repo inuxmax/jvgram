@@ -37,6 +37,10 @@ import { omit, unique } from '../iteratees';
 import { replaceInStringsWithTeact } from '../replaceWithTeact';
 import { fastRaf } from '../schedulers';
 import { resetDateFormatCache } from './dateFormat';
+import {
+  getExtraInterfaceLanguage,
+  loadLocalLangOverrides,
+} from './localLanguages';
 
 import Deferred from '../Deferred';
 import LimitedMap from '../primitives/LimitedMap';
@@ -205,6 +209,21 @@ function updateLangPack(newLangPack: LangPack) {
   scheduleCallbacks();
 }
 
+async function applyLocalLangOverrides(langCode: string) {
+  const overrides = await loadLocalLangOverrides(langCode);
+  if (!langPack || !Object.keys(overrides).length) return;
+
+  langPack = {
+    ...langPack,
+    strings: {
+      ...langPack.strings,
+      ...overrides,
+    },
+  };
+  TRANSLATION_CACHE.clear();
+  translationFn = createTranslationFn();
+}
+
 export async function initLocalization(langCode: string, canLoadFromServer?: boolean) {
   if (language) return;
 
@@ -221,6 +240,8 @@ export async function initLocalization(langCode: string, canLoadFromServer?: boo
 
   // Always start loading fallback pack in the background. Some languages may not have every string translated.
   loadFallbackPack();
+
+  await applyLocalLangOverrides(langCode);
 
   translationFn = createTranslationFn();
   scheduleCallbacks();
@@ -254,11 +275,16 @@ export async function loadAndChangeLanguage(langCode: string, shouldCheckCache?:
   });
 
   if (!remoteLanguage) {
-    if (DEBUG) {
-      // eslint-disable-next-line no-console
-      console.warn('Failed to fetch language', langCode);
+    const extraLanguage = getExtraInterfaceLanguage(langCode);
+    if (!extraLanguage) {
+      if (DEBUG) {
+        // eslint-disable-next-line no-console
+        console.warn('Failed to fetch language', langCode);
+      }
+      return undefined;
     }
-    return undefined;
+
+    return changeLanguage(extraLanguage);
   }
 
   return changeLanguage(remoteLanguage);
@@ -286,23 +312,35 @@ export async function changeLanguage(newLanguage: ApiLanguage) {
       langCode: newLanguage.langCode,
     });
     if (!remoteLangPack) {
-      // eslint-disable-next-line no-console
-      console.warn('Failed to fetch lang pack');
-      return;
+      const localStrings = await loadLocalLangOverrides(newLanguage.langCode);
+      if (!Object.keys(localStrings).length) {
+        // eslint-disable-next-line no-console
+        console.warn('Failed to fetch lang pack');
+        return;
+      }
+
+      updateLangPack({
+        langCode: newLanguage.langCode,
+        version: 0,
+        strings: localStrings,
+      });
+      updateLanguage(newLanguage);
+    } else {
+      updateLangPack({
+        langCode: newLanguage.langCode,
+        version: remoteLangPack.version,
+        strings: remoteLangPack.strings,
+      });
+      updateLanguage(newLanguage);
+
+      cacheLangData({
+        langPack: langPack!,
+        language: newLanguage,
+      });
     }
-
-    updateLangPack({
-      langCode: newLanguage.langCode,
-      version: remoteLangPack.version,
-      strings: remoteLangPack.strings,
-    });
-    updateLanguage(newLanguage);
-
-    cacheLangData({
-      langPack: langPack!,
-      language: newLanguage,
-    });
   }
+
+  await applyLocalLangOverrides(newLanguage.langCode);
 
   document.documentElement.lang = newLanguage.baseLangCode || newLanguage.langCode;
 

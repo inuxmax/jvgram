@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>Telegram Air</title>
+    <title>JVgram</title>
     <style>
       html,
       body {
@@ -117,9 +117,9 @@
       <img class="avatar is-hidden" id="avatar" alt="" />
       <div class="fallback" id="fallback">A</div>
       <div class="texts">
-        <div class="title" id="title">Telegram Air</div>
+        <div class="title" id="title">JVgram</div>
         <div class="body" id="body"></div>
-        <div class="app" id="app">Telegram Air</div>
+        <div class="app" id="app">JVgram</div>
       </div>
     </div>
     <script>
@@ -148,9 +148,9 @@
         const toast = window.__TOAST__ || {};
         applyTheme(toast.theme);
 
-        document.getElementById("title").textContent = toast.title || toast.appName || "Telegram Air";
+        document.getElementById("title").textContent = toast.title || toast.appName || "JVgram";
         document.getElementById("body").textContent = toast.body || "";
-        document.getElementById("app").textContent = toast.appName || "Telegram Air";
+        document.getElementById("app").textContent = toast.appName || "JVgram";
         document.getElementById("fallback").textContent = initialLetter(toast.title || toast.appName);
 
         const avatar = document.getElementById("avatar");

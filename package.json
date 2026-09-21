@@ -17,7 +17,7 @@
     "build:stats:visualizer": "cross-env BUNDLE_STATS_VISUALIZER=1 vite build",
     "web:release:production": "npm i && npm run build:production && git add -A && git commit -a -m '[Build]' --no-verify && git push",
     "tauri": "tauri",
-    "tauri:dev": "cross-env BASE_URL=http://localhost:1234/ tauri dev",
+    "tauri:dev": "cross-env BASE_URL=http://localhost:1234/ tauri dev --config tauri/tauri.dev.json",
     "admin:dev": "npm run dev --prefix admin",
     "tauri:build": "tauri build",
     "telegraph:update_changelog": "node ./dev/telegraphChangelog.js",

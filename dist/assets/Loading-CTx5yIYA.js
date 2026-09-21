@@ -1,0 +1,2 @@
+import{u as e}from"./teact-DfHR17Bp.js";import{gp as t,o as n,pu as r}from"./InputText-CqMMspZN.js";var i=`F:/telegram-A/src/components/ui/Loading.tsx`,a=e(({color:e=`blue`,backgroundColor:a,className:o,onClick:s})=>t(`div`,{className:r(`Loading`,s&&`interactive`,o),onClick:s,children:t(n,{color:e,backgroundColor:a},void 0,!1,{fileName:i,lineNumber:21,columnNumber:7},void 0)},void 0,!1,{fileName:i,lineNumber:20,columnNumber:5},void 0));export{a as t};
+//# sourceMappingURL=Loading-CTx5yIYA.js.map

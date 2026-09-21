@@ -8,6 +8,7 @@ import {
 } from '../config';
 import { selectSharedSettings } from '../global/selectors/sharedState';
 import { callApi } from '../api/gramjs';
+import { loadLocalLangOverrideRaw } from './localization/localLanguages';
 import * as cacheApi from './cacheApi';
 import { createCallbackManager } from './callbacks';
 import { loadAndChangeLanguage } from './localization';
@@ -101,6 +102,7 @@ const PLURAL_RULES = {
   tr: (n: number) => (n > 1 ? 6 : 2),
   uk: (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 2 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 4 : 5),
   uz: (n: number) => (n > 1 ? 6 : 2),
+  vi: (n: number) => (n !== 1 ? 6 : 2),
   /* eslint-enable @stylistic/max-len */
 };
 
@@ -167,9 +169,18 @@ export async function oldSetLanguage(langCode: LangCode, callback?: NoneToVoidFu
   let newLangPack = await cacheApi.fetch(LANG_CACHE_NAME, langCode, cacheApi.Type.Json);
   if (!newLangPack) {
     newLangPack = await fetchRemote(langCode);
-    if (!newLangPack) {
-      return;
-    }
+  }
+
+  const localOverrides = await loadLocalLangOverrideRaw(langCode);
+  if (localOverrides && Object.keys(localOverrides).length) {
+    newLangPack = {
+      ...(newLangPack || {}),
+      ...localOverrides,
+    };
+  }
+
+  if (!newLangPack) {
+    return;
   }
 
   cache.clear();

@@ -1,2 +1,0 @@
-import{fu as e,hp as t}from"./InputText-BGXggnQa.js";var n={root:`_40aWbFdG`,thin:`_1yj96yuC`,thick:`_5EdrUuc8`},r=`F:/telegram-A/src/components/ui/MenuSeparator.tsx`,i=({className:i,size:a=`thin`})=>t(`div`,{className:e(n.root,n[a],i)},void 0,!1,{fileName:r,lineNumber:14,columnNumber:5},void 0);export{i as t};
-//# sourceMappingURL=MenuSeparator-3itG6NdB.js.map
