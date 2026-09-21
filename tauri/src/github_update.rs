@@ -98,35 +98,47 @@ pub async fn install(app: tauri::AppHandle, download_url: String) -> Result<(), 
 
   let total = response.content_length();
   let installer_path = std::env::temp_dir().join(file_name);
-  let mut file = std::fs::File::create(&installer_path).map_err(|err| err.to_string())?;
   let mut downloaded: u64 = 0;
   let mut last_percent: u8 = 0;
   let mut response = response;
 
-  emit_progress(&app, 0, 0, total);
+  {
+    let mut file = std::fs::File::create(&installer_path).map_err(|err| err.to_string())?;
+    emit_progress(&app, 0, 0, total);
 
-  loop {
-    let chunk = response.chunk().await.map_err(|err| err.to_string())?;
-    let Some(chunk) = chunk else { break };
+    loop {
+      let chunk = response.chunk().await.map_err(|err| err.to_string())?;
+      let Some(chunk) = chunk else { break };
 
-    file.write_all(&chunk).map_err(|err| err.to_string())?;
-    downloaded = downloaded.saturating_add(chunk.len() as u64);
+      file.write_all(&chunk).map_err(|err| err.to_string())?;
+      downloaded = downloaded.saturating_add(chunk.len() as u64);
 
-    let percent = match total {
-      Some(total) if total > 0 => ((downloaded.saturating_mul(100)) / total).min(100) as u8,
-      _ => 0,
-    };
+      let percent = match total {
+        Some(total) if total > 0 => ((downloaded.saturating_mul(100)) / total).min(100) as u8,
+        _ => 0,
+      };
 
-    if percent != last_percent {
-      last_percent = percent;
-      emit_progress(&app, percent, downloaded, total);
+      if percent != last_percent {
+        last_percent = percent;
+        emit_progress(&app, percent, downloaded, total);
+      }
+    }
+
+    file.flush().map_err(|err| err.to_string())?;
+    let _ = file.sync_all();
+  }
+
+  if downloaded == 0 {
+    return Err("Downloaded installer is empty".to_string());
+  }
+  if let Some(total) = total {
+    if downloaded < total {
+      return Err(format!("Download incomplete ({downloaded}/{total})"));
     }
   }
 
-  file.flush().map_err(|err| err.to_string())?;
   emit_progress(&app, 100, downloaded, total);
-
-  spawn_installer(&installer_path)?;
+  spawn_installer_with_retry(&installer_path)?;
   app.exit(0);
   Ok(())
 }
@@ -142,6 +154,20 @@ fn emit_progress(app: &tauri::AppHandle, percent: u8, downloaded: u64, total: Op
   );
 }
 
+fn spawn_installer_with_retry(path: &std::path::Path) -> Result<(), String> {
+  let mut last_err = String::from("Could not start installer");
+  for attempt in 0..8 {
+    match spawn_installer(path) {
+      Ok(()) => return Ok(()),
+      Err(err) => {
+        last_err = err;
+        std::thread::sleep(Duration::from_millis(250 * (attempt + 1)));
+      }
+    }
+  }
+  Err(last_err)
+}
+
 fn spawn_installer(path: &std::path::Path) -> Result<(), String> {
   #[cfg(windows)]
   {
@@ -149,13 +175,31 @@ fn spawn_installer(path: &std::path::Path) -> Result<(), String> {
 
     const DETACHED_PROCESS: u32 = 0x00000008;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
     const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x01000000;
 
-    std::process::Command::new(path)
-      .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB)
+    let flag_sets = [
+      DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
+      DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB,
+      0,
+    ];
+    for flags in flag_sets {
+      let mut command = std::process::Command::new(path);
+      if flags != 0 {
+        command.creation_flags(flags);
+      }
+      if command.spawn().is_ok() {
+        return Ok(());
+      }
+    }
+
+    let start_cmd = format!("start \"\" \"{}\"", path.display());
+    std::process::Command::new("cmd")
+      .args(["/C", &start_cmd])
+      .creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
       .spawn()
-      .map_err(|err| err.to_string())?;
-    return Ok(());
+      .map(|_| ())
+      .map_err(|err| err.to_string())
   }
 
   #[cfg(not(windows))]
