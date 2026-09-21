@@ -6,12 +6,6 @@ pub const NOTIFICATION_CLICKED_EVENT: &str = "notification-clicked";
 pub const DESKTOP_TOAST_WINDOW_LABEL: &str = "desktop-toast";
 
 #[cfg(windows)]
-const TOAST_WIDTH: f64 = 360.0;
-#[cfg(windows)]
-const TOAST_HEIGHT: f64 = 104.0;
-#[cfg(windows)]
-const TOAST_MARGIN: f64 = 16.0;
-#[cfg(windows)]
 const WINDOWS_TOAST_TITLE_MAX: usize = 64;
 #[cfg(windows)]
 const WINDOWS_TOAST_BODY_MAX: usize = 180;
@@ -226,9 +220,11 @@ pub fn show_windows_toast(
   chat_id: Option<String>,
   message_id: Option<i32>,
   is_call: bool,
-  theme: &str,
-  avatar_data_url: Option<String>,
+  _theme: &str,
+  _avatar_data_url: Option<String>,
 ) -> Result<(), String> {
+  close_desktop_toast(app);
+
   if let Ok(mut pending) = PENDING_TOAST.lock() {
     *pending = Some(NotificationClickPayload {
       chat_id: chat_id.clone(),
@@ -237,125 +233,7 @@ pub fn show_windows_toast(
     });
   }
 
-  if let Err(err) = show_themed_toast_window(
-    app,
-    title,
-    body,
-    theme,
-    avatar_data_url.as_deref(),
-  ) {
-    log::warn!("Themed desktop toast failed, using Action Center: {err}");
-    return show_action_center_toast(app, title, body, chat_id, message_id, is_call);
-  }
-
-  Ok(())
-}
-
-#[cfg(windows)]
-fn show_themed_toast_window(
-  app: &AppHandle,
-  title: &str,
-  body: &str,
-  theme: &str,
-  avatar_data_url: Option<&str>,
-) -> Result<(), String> {
-  use tauri::{LogicalPosition, WebviewUrl};
-
-  let payload = serde_json::json!({
-    "title": truncate_chars(title, WINDOWS_TOAST_TITLE_MAX),
-    "body": truncate_chars(body, WINDOWS_TOAST_BODY_MAX),
-    "theme": if theme == "light" { "light" } else { "dark" },
-    "avatarDataUrl": avatar_data_url,
-    "appName": crate::DEFAULT_WINDOW_TITLE,
-  });
-  let payload_js = serde_json::to_string(&payload)
-    .map_err(|err| err.to_string())?
-    .replace('<', "\\u003c");
-  let theme_class = if theme == "light" {
-    "theme-light"
-  } else {
-    "theme-dark"
-  };
-  let background = if theme == "light" {
-    tauri::window::Color(255, 255, 255, 255)
-  } else {
-    tauri::window::Color(33, 33, 33, 255)
-  };
-
-  let (pos_x, pos_y) = toast_position(app);
-  let apply_script = format!(
-    r#"window.__TOAST__ = {payload_js};
-(function () {{
-  var themeClass = {theme_class:?};
-  var apply = function () {{
-    document.documentElement.className = themeClass;
-    if (document.body) document.body.className = themeClass;
-    if (window.renderToast) window.renderToast();
-  }};
-  apply();
-  document.addEventListener("DOMContentLoaded", apply);
-}})();"#
-  );
-
-  if let Some(window) = app.get_webview_window(DESKTOP_TOAST_WINDOW_LABEL) {
-    let _ = window.set_position(tauri::Position::Logical(LogicalPosition::new(pos_x, pos_y)));
-    let _ = window.eval(&apply_script);
-    let _ = window.show();
-    return Ok(());
-  }
-
-  tauri::WebviewWindowBuilder::new(
-    app,
-    DESKTOP_TOAST_WINDOW_LABEL,
-    WebviewUrl::App("desktop-toast.html".into()),
-  )
-  .title(crate::DEFAULT_WINDOW_TITLE)
-  .inner_size(TOAST_WIDTH, TOAST_HEIGHT)
-  .position(pos_x, pos_y)
-  .decorations(false)
-  .resizable(false)
-  .maximizable(false)
-  .minimizable(false)
-  .always_on_top(true)
-  .skip_taskbar(true)
-  .focused(false)
-  .transparent(false)
-  .shadow(true)
-  .visible(true)
-  .background_color(background)
-  .initialization_script(&apply_script)
-  .build()
-  .map_err(|err| err.to_string())?;
-
-  Ok(())
-}
-
-#[cfg(windows)]
-fn toast_position(app: &AppHandle) -> (f64, f64) {
-  let Some(window) = app
-    .webview_windows()
-    .into_iter()
-    .find(|(label, _)| !is_desktop_toast_window(label))
-    .map(|(_, window)| window)
-  else {
-    return (TOAST_MARGIN, TOAST_MARGIN);
-  };
-
-  let Ok(Some(monitor)) = window.current_monitor() else {
-    return (TOAST_MARGIN, TOAST_MARGIN);
-  };
-
-  let scale = monitor.scale_factor();
-  let work = monitor.work_area();
-  let x = f64::from(work.position.x) / scale
-    + f64::from(work.size.width) / scale
-    - TOAST_WIDTH
-    - TOAST_MARGIN;
-  let y = f64::from(work.position.y) / scale
-    + f64::from(work.size.height) / scale
-    - TOAST_HEIGHT
-    - TOAST_MARGIN;
-  (x, y)
+  show_action_center_toast(app, title, body, chat_id, message_id, is_call)
 }
 
 #[cfg(windows)]
@@ -423,18 +301,28 @@ fn show_action_center_toast(
 
 #[cfg(windows)]
 fn build_toast_xml(title: &str, body: &str) -> String {
+  let title = truncate_chars(title, WINDOWS_TOAST_TITLE_MAX);
+  let title = if title.trim().is_empty() {
+    crate::DEFAULT_WINDOW_TITLE.to_string()
+  } else {
+    title
+  };
+  let body = truncate_chars(body, WINDOWS_TOAST_BODY_MAX);
+
   format!(
-    r#"<toast activationType="foreground">
+    r#"<toast activationType="foreground" duration="long">
   <visual>
     <binding template="ToastGeneric">
       <text>{}</text>
       <text>{}</text>
+      <text placement="attribution">{}</text>
     </binding>
   </visual>
   <audio silent="true"/>
 </toast>"#,
-    escape_xml(&truncate_chars(title, WINDOWS_TOAST_TITLE_MAX)),
-    escape_xml(&truncate_chars(body, WINDOWS_TOAST_BODY_MAX)),
+    escape_xml(&title),
+    escape_xml(&body),
+    escape_xml(crate::DEFAULT_WINDOW_TITLE),
   )
 }
 
