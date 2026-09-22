@@ -33,18 +33,14 @@
 }
 
 #Main.chatHub-open {
+  --composer-bottom-gap: 1.5rem;
+
   #MiddleColumn {
-    height: calc(100% - 1rem);
+    min-height: 0;
 
-    @media (max-width: 925px) {
-      bottom: 1rem;
-      height: auto;
+    .middle-column-footer {
+      bottom: 0.75rem;
     }
-  }
-
-  .chathubAccountFrame {
-    height: calc(100% - 1rem);
-    margin-bottom: 1rem;
   }
 }
 

@@ -1,6 +1,6 @@
  [package]
 name = "telegram_air"
-version = "2.11.17"
+version = "2.11.18"
 description = "JVgram"
 authors = ["Alexander Zinchuk"]
 license = "GPLv3"
@@ -43,11 +43,15 @@ windows = { version = "0.61", features = [
   "Foundation",
   "UI_Notifications",
   "Win32_Foundation",
+  "Win32_Graphics_Dwm",
+  "Win32_Graphics_Gdi",
   "Win32_System_Com",
   "Win32_System_Com_StructuredStorage",
+  "Win32_System_LibraryLoader",
   "Win32_System_Variant",
   "Win32_UI_Shell",
   "Win32_UI_Shell_PropertiesSystem",
+  "Win32_UI_WindowsAndMessaging",
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]

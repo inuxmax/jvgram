@@ -112,6 +112,7 @@ body.is-tauri.is-windows:not(.is-tauri-fullscreen) {
 
 html.chathub-embed {
   --tauri-caption-height: 0rem;
+  --composer-bottom-gap: 1.5rem;
 
   #FoldersSidebar,
   #LeftColumn,
@@ -121,6 +122,10 @@ html.chathub-embed {
 
   #Main {
     grid-template-columns: 1fr !important;
+
+    .middle-column-footer {
+      bottom: 0.75rem;
+    }
   }
 
   body.is-tauri.is-windows:not(.is-tauri-fullscreen) {

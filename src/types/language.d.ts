@@ -441,6 +441,7 @@ export interface LangPair {
   'DataSettings': undefined;
   'PrivacySettings': undefined;
   'Language': undefined;
+  'SettingsChangeLang': undefined;
   'SettingsExperimental': undefined;
   'PrivacyPhone': undefined;
   'PrivacyLastSeen': undefined;
@@ -757,6 +758,7 @@ export interface LangPair {
   'MessageScheduleSend': undefined;
   'MessageScheduleEditTime': undefined;
   'Reply': undefined;
+  'ContextQuoteAndReply': undefined;
   'Edit': undefined;
   'AddToFavorites': undefined;
   'ContextSaveGif': undefined;

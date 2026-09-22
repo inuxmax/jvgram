@@ -467,7 +467,7 @@ const MessageContextMenu = ({
         )}
         {canReply && (
           <MenuItem icon="reply" onClick={onReply}>
-            {oldLang(canQuote ? 'lng_context_quote_and_reply' : 'Reply')}
+            {canQuote ? lang('ContextQuoteAndReply') : oldLang('Reply')}
           </MenuItem>
         )}
         {!noReplies && Boolean(repliesThreadInfo?.messagesCount) && (
@@ -529,7 +529,7 @@ const MessageContextMenu = ({
           </NestedMenuItem>
         )}
         {canSelectLanguage && (
-          <MenuItem icon="web" onClick={onSelectLanguage}>{oldLang('lng_settings_change_lang')}</MenuItem>
+          <MenuItem icon="web" onClick={onSelectLanguage}>{lang('SettingsChangeLang')}</MenuItem>
         )}
         {copyOptions.map((option) => (
           isAltKeyPressed && option.canCopyWithFormat ? (
@@ -553,13 +553,13 @@ const MessageContextMenu = ({
               onClick={() => option.handler()}
               withPreventDefaultOnMouseDown
             >
-              {oldLang(option.label)}
+              {lang(option.label)}
             </MenuItem>
           )
         ))}
         {canPin && <MenuItem icon="pin" onClick={onPin}>{oldLang('DialogPin')}</MenuItem>}
         {canUnpin && <MenuItem icon="unpin" onClick={onUnpin}>{oldLang('DialogUnpin')}</MenuItem>}
-        {canSaveGif && <MenuItem icon="gifs" onClick={onSaveGif}>{oldLang('lng_context_save_gif')}</MenuItem>}
+        {canSaveGif && <MenuItem icon="gifs" onClick={onSaveGif}>{lang('ContextSaveGif')}</MenuItem>}
         {canManageMusicInProfile && (
           <Transition
             activeKey={!isMusicProfileStatusLoaded ? 0 : (isMusicSaved ? 2 : 1)}
@@ -582,16 +582,16 @@ const MessageContextMenu = ({
             )}
           </Transition>
         )}
-        {canRevote && <MenuItem icon="revote" onClick={onCancelVote}>{oldLang('lng_polls_retract')}</MenuItem>}
-        {canClosePoll && <MenuItem icon="stop" onClick={onClosePoll}>{oldLang('lng_polls_stop')}</MenuItem>}
+        {canRevote && <MenuItem icon="revote" onClick={onCancelVote}>{lang('PollsRetract')}</MenuItem>}
+        {canClosePoll && <MenuItem icon="stop" onClick={onClosePoll}>{lang('PollsStop')}</MenuItem>}
         {canDownload && (
           <MenuItem icon="download" onClick={onDownload}>
-            {isDownloading ? oldLang('lng_context_cancel_download') : oldLang('lng_media_download')}
+            {isDownloading ? lang('ContextCancelDownload') : lang('MediaDownload')}
           </MenuItem>
         )}
         {canForward && <MenuItem icon="forward" onClick={onForward}>{oldLang('Forward')}</MenuItem>}
         {canSelect && <MenuItem icon="select" onClick={onSelect}>{oldLang('Common.Select')}</MenuItem>}
-        {canReport && <MenuItem icon="flag" onClick={onReport}>{oldLang('lng_context_report_msg')}</MenuItem>}
+        {canReport && <MenuItem icon="flag" onClick={onReport}>{lang('ContextReportMsg')}</MenuItem>}
         {canDelete && <MenuItem destructive icon="delete" onClick={onDelete}>{oldLang('Delete')}</MenuItem>}
         {message.isEphemeral && (
           <>

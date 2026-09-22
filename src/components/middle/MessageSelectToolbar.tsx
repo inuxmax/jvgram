@@ -255,10 +255,10 @@ const MessageSelectToolbar = ({
                     renderButton('flag', oldLang('Conversation.ReportMessages'), openMessageReport)
                   )}
                   {rendering.canDownloadMessages && !rendering.hasProtectedMessage && (
-                    renderButton('download', oldLang('lng_media_download'), handleMessageDownload)
+                    renderButton('download', lang('MediaDownload'), handleMessageDownload)
                   )}
                   {!rendering.hasProtectedMessage && (
-                    renderButton('copy', oldLang('lng_context_copy_selected_items'), handleCopy)
+                    renderButton('copy', lang('ContextCopySelectedItems'), handleCopy)
                   )}
                   {rendering.messageListType !== 'scheduled' && rendering.canForwardMessages && (
                     renderButton(

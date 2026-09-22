@@ -375,6 +375,7 @@ fn show_desktop_notification(
   is_call: Option<bool>,
   theme: Option<String>,
   avatar_data_url: Option<String>,
+  account_name: Option<String>,
 ) -> Result<(), String> {
   let is_call = is_call.unwrap_or(false);
   #[cfg(windows)]
@@ -391,6 +392,7 @@ fn show_desktop_notification(
           is_call,
           theme.as_deref().unwrap_or("dark"),
           avatar_data_url,
+          account_name,
         ) {
           log::error!("Failed to show Windows notification: {err}");
         }

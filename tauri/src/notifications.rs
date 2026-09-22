@@ -61,6 +61,8 @@ pub fn is_app_window_active(app: &AppHandle) -> bool {
 }
 
 pub fn close_desktop_toast(app: &AppHandle) {
+  #[cfg(windows)]
+  destroy_monitor_toast();
   if let Some(window) = app.get_webview_window(DESKTOP_TOAST_WINDOW_LABEL) {
     let _ = window.close();
   }
@@ -220,8 +222,9 @@ pub fn show_windows_toast(
   chat_id: Option<String>,
   message_id: Option<i32>,
   is_call: bool,
-  _theme: &str,
+  theme: &str,
   _avatar_data_url: Option<String>,
+  account_name: Option<String>,
 ) -> Result<(), String> {
   close_desktop_toast(app);
 
@@ -233,7 +236,475 @@ pub fn show_windows_toast(
     });
   }
 
-  show_action_center_toast(app, title, body, chat_id, message_id, is_call)
+  if let Err(err) = show_monitor_toast(app, title, body, theme, is_call, account_name.as_deref()) {
+    log::warn!("Monitor toast failed, falling back to Action Center: {err}");
+    show_action_center_toast(app, title, body, chat_id, message_id, is_call, account_name.as_deref())
+  } else {
+    Ok(())
+  }
+}
+
+#[cfg(windows)]
+const MONITOR_TOAST_CLASS: &str = "JVgramMonitorToast";
+#[cfg(windows)]
+const MONITOR_TOAST_WIDTH: i32 = 360;
+#[cfg(windows)]
+const MONITOR_TOAST_HEIGHT: i32 = 108;
+#[cfg(windows)]
+const MONITOR_TOAST_MARGIN: i32 = 16;
+#[cfg(windows)]
+const MONITOR_TOAST_TIMER_ID: usize = 1;
+#[cfg(windows)]
+const MONITOR_TOAST_DURATION_MS: u32 = 6000;
+#[cfg(windows)]
+const MONITOR_TOAST_CALL_DURATION_MS: u32 = 10000;
+
+#[cfg(windows)]
+#[derive(Clone)]
+struct MonitorToastUi {
+  hwnd: isize,
+  title: String,
+  body: String,
+  account: String,
+  is_dark: bool,
+  scale: f64,
+}
+
+#[cfg(windows)]
+static MONITOR_TOAST_UI: std::sync::Mutex<Option<MonitorToastUi>> = std::sync::Mutex::new(None);
+#[cfg(windows)]
+static MONITOR_TOAST_APP: std::sync::Mutex<Option<AppHandle>> = std::sync::Mutex::new(None);
+
+#[cfg(windows)]
+fn main_app_window(app: &AppHandle) -> Option<tauri::Window> {
+  let mut windows: Vec<_> = app
+    .windows()
+    .into_iter()
+    .filter(|(label, _)| !is_desktop_toast_window(label))
+    .map(|(_, window)| window)
+    .collect();
+
+  windows.sort_by_key(|window| {
+    let focused = window.is_focused().unwrap_or(false);
+    let visible = window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false);
+    (!focused, !visible)
+  });
+  windows.into_iter().next()
+}
+
+#[cfg(windows)]
+fn scale_px(logical: i32, scale: f64) -> i32 {
+  (logical as f64 * scale).round().max(1.0) as i32
+}
+
+#[cfg(windows)]
+fn show_monitor_toast(
+  app: &AppHandle,
+  title: &str,
+  body: &str,
+  theme: &str,
+  is_call: bool,
+  account_name: Option<&str>,
+) -> Result<(), String> {
+  use windows::Win32::Graphics::Dwm::{
+    DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUNDSMALL, DwmSetWindowAttribute,
+  };
+  use windows::Win32::UI::WindowsAndMessaging::{
+    HWND_TOPMOST, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_SHOWNOACTIVATE, SetTimer, SetWindowPos,
+    ShowWindow,
+  };
+
+  let window = main_app_window(app).ok_or("No app window")?;
+  let monitor = window
+    .current_monitor()
+    .ok()
+    .flatten()
+    .or_else(|| {
+      window.outer_position().ok().and_then(|position| {
+        window
+          .monitor_from_point(f64::from(position.x), f64::from(position.y))
+          .ok()
+          .flatten()
+      })
+    })
+    .or_else(|| window.primary_monitor().ok().flatten())
+    .ok_or("No monitor")?;
+
+  let work = monitor.work_area();
+  let scale = monitor.scale_factor().max(1.0);
+  let width = scale_px(MONITOR_TOAST_WIDTH, scale);
+  let height = scale_px(MONITOR_TOAST_HEIGHT, scale);
+  let margin = scale_px(MONITOR_TOAST_MARGIN, scale);
+  let work_right = work.position.x.saturating_add_unsigned(work.size.width);
+  let x = (work_right - width - margin).max(work.position.x + margin);
+  let y = work.position.y + margin;
+
+  if let Ok(mut stored) = MONITOR_TOAST_APP.lock() {
+    *stored = Some(app.clone());
+  }
+
+  let title = truncate_chars(title, WINDOWS_TOAST_TITLE_MAX);
+  let title = if title.trim().is_empty() {
+    crate::DEFAULT_WINDOW_TITLE.to_string()
+  } else {
+    title
+  };
+  let body = truncate_chars(body, WINDOWS_TOAST_BODY_MAX);
+  let account = account_name
+    .map(|name| truncate_chars(name, WINDOWS_TOAST_TITLE_MAX))
+    .filter(|name| !name.trim().is_empty())
+    .unwrap_or_default();
+  let is_dark = theme != "light";
+  let duration = if is_call {
+    MONITOR_TOAST_CALL_DURATION_MS
+  } else {
+    MONITOR_TOAST_DURATION_MS
+  };
+
+  let hwnd = if let Some(existing) = current_monitor_toast_hwnd() {
+    existing
+  } else {
+    create_monitor_toast_window(width, height)?
+  };
+
+  unsafe {
+    let _ = SetWindowPos(
+      hwnd,
+      Some(HWND_TOPMOST),
+      x,
+      y,
+      width,
+      height,
+      SWP_NOACTIVATE | SWP_SHOWWINDOW,
+    );
+    let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+    let corner = DWMWCP_ROUNDSMALL;
+    let _ = DwmSetWindowAttribute(
+      hwnd,
+      DWMWA_WINDOW_CORNER_PREFERENCE,
+      std::ptr::from_ref(&corner).cast(),
+      std::mem::size_of_val(&corner) as u32,
+    );
+    let _ = SetTimer(Some(hwnd), MONITOR_TOAST_TIMER_ID, duration, None);
+  }
+
+  if let Ok(mut ui) = MONITOR_TOAST_UI.lock() {
+    *ui = Some(MonitorToastUi {
+      hwnd: hwnd.0 as isize,
+      title,
+      body,
+      account,
+      is_dark,
+      scale,
+    });
+  }
+
+  unsafe {
+    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(Some(hwnd), None, true);
+  }
+
+  Ok(())
+}
+
+#[cfg(windows)]
+fn current_monitor_toast_hwnd() -> Option<windows::Win32::Foundation::HWND> {
+  use windows::Win32::Foundation::HWND;
+  use windows::Win32::UI::WindowsAndMessaging::IsWindow;
+
+  let hwnd_value = MONITOR_TOAST_UI.lock().ok()?.as_ref()?.hwnd;
+  let hwnd = HWND(hwnd_value as *mut std::ffi::c_void);
+  unsafe {
+    if IsWindow(Some(hwnd)).as_bool() {
+      Some(hwnd)
+    } else {
+      None
+    }
+  }
+}
+
+#[cfg(windows)]
+fn destroy_monitor_toast() {
+  use windows::Win32::Foundation::HWND;
+  use windows::Win32::UI::WindowsAndMessaging::{DestroyWindow, IsWindow, KillTimer};
+
+  let hwnd_value = MONITOR_TOAST_UI.lock().ok().and_then(|mut ui| ui.take().map(|toast| toast.hwnd));
+  if let Some(hwnd_value) = hwnd_value {
+    let hwnd = HWND(hwnd_value as *mut std::ffi::c_void);
+    unsafe {
+      if IsWindow(Some(hwnd)).as_bool() {
+        let _ = KillTimer(Some(hwnd), MONITOR_TOAST_TIMER_ID);
+        let _ = DestroyWindow(hwnd);
+      }
+    }
+  }
+}
+
+#[cfg(windows)]
+fn create_monitor_toast_window(width: i32, height: i32) -> Result<windows::Win32::Foundation::HWND, String> {
+  use std::sync::Once;
+
+  use windows::Win32::Foundation::HINSTANCE;
+  use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+  use windows::Win32::UI::WindowsAndMessaging::{
+    CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW, CreateWindowExW, IDC_HAND, LoadCursorW, RegisterClassExW,
+    WNDCLASSEXW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+  };
+  use windows::core::PCWSTR;
+
+  static REGISTER_CLASS: Once = Once::new();
+  let class_name = to_wide(MONITOR_TOAST_CLASS);
+  REGISTER_CLASS.call_once(|| {
+    let instance = unsafe { GetModuleHandleW(PCWSTR::null()) }.ok();
+    let cursor = unsafe { LoadCursorW(None, IDC_HAND) }.unwrap_or_default();
+    let class = WNDCLASSEXW {
+      cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+      style: CS_HREDRAW | CS_VREDRAW | CS_DROPSHADOW,
+      lpfnWndProc: Some(monitor_toast_wnd_proc),
+      hInstance: instance.map(HINSTANCE::from).unwrap_or_default(),
+      hCursor: cursor,
+      lpszClassName: PCWSTR(class_name.as_ptr()),
+      ..Default::default()
+    };
+    unsafe {
+      RegisterClassExW(&class);
+    }
+  });
+
+  let instance = unsafe { GetModuleHandleW(PCWSTR::null()) }.map_err(|err| err.to_string())?;
+  unsafe {
+    CreateWindowExW(
+      WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+      PCWSTR(class_name.as_ptr()),
+      PCWSTR::null(),
+      WS_POPUP,
+      0,
+      0,
+      width,
+      height,
+      None,
+      None,
+      Some(HINSTANCE::from(instance)),
+      None,
+    )
+    .map_err(|err| err.to_string())
+  }
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn monitor_toast_wnd_proc(
+  hwnd: windows::Win32::Foundation::HWND,
+  msg: u32,
+  wparam: windows::Win32::Foundation::WPARAM,
+  lparam: windows::Win32::Foundation::LPARAM,
+) -> windows::Win32::Foundation::LRESULT {
+  use windows::Win32::Foundation::LRESULT;
+  use windows::Win32::UI::WindowsAndMessaging::{
+    DefWindowProcW, WM_DESTROY, WM_ERASEBKGND, WM_LBUTTONUP, WM_PAINT, WM_TIMER,
+  };
+
+  match msg {
+    WM_ERASEBKGND => LRESULT(1),
+    WM_PAINT => {
+      paint_monitor_toast(hwnd);
+      LRESULT(0)
+    }
+    WM_LBUTTONUP => {
+      if let Ok(guard) = MONITOR_TOAST_APP.lock() {
+        if let Some(app) = guard.as_ref() {
+          activate_desktop_toast(app);
+        }
+      }
+      LRESULT(0)
+    }
+    WM_TIMER => {
+      destroy_monitor_toast();
+      LRESULT(0)
+    }
+    WM_DESTROY => {
+      if let Ok(mut ui) = MONITOR_TOAST_UI.lock() {
+        if ui.as_ref().is_some_and(|toast| toast.hwnd == hwnd.0 as isize) {
+          *ui = None;
+        }
+      }
+      LRESULT(0)
+    }
+    _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+  }
+}
+
+#[cfg(windows)]
+fn paint_monitor_toast(hwnd: windows::Win32::Foundation::HWND) {
+  use windows::Win32::Foundation::{COLORREF, RECT};
+  use windows::Win32::Graphics::Gdi::{
+    BeginPaint, CLEARTYPE_QUALITY, CreateFontW, CreateSolidBrush, DEFAULT_CHARSET, DT_END_ELLIPSIS,
+    DT_LEFT, DT_NOPREFIX, DT_SINGLELINE, DT_TOP, DT_WORDBREAK, DeleteObject, DrawTextW, EndPaint,
+    FillRect, PAINTSTRUCT, SelectObject, SetBkMode, SetTextColor, TRANSPARENT,
+  };
+  use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
+  use windows::core::w;
+
+  let ui = MONITOR_TOAST_UI.lock().ok().and_then(|guard| guard.clone());
+  let Some(ui) = ui else {
+    return;
+  };
+
+  let mut paint = PAINTSTRUCT::default();
+  let hdc = unsafe { BeginPaint(hwnd, &mut paint) };
+  if hdc.0.is_null() {
+    return;
+  }
+
+  let mut client = RECT::default();
+  let _ = unsafe { GetClientRect(hwnd, &mut client) };
+
+  let (bg, title_color, body_color, account_color, accent) = if ui.is_dark {
+    (
+      COLORREF(0x00_1F_1F_1F),
+      COLORREF(0x00_FF_FF_FF),
+      COLORREF(0x00_C8_C8_C8),
+      COLORREF(0x00_EC_90_33),
+      COLORREF(0x00_EC_90_33),
+    )
+  } else {
+    (
+      COLORREF(0x00_FF_FF_FF),
+      COLORREF(0x00_11_11_11),
+      COLORREF(0x00_5A_5A_5A),
+      COLORREF(0x00_EC_90_33),
+      COLORREF(0x00_EC_90_33),
+    )
+  };
+
+  unsafe {
+    let background = CreateSolidBrush(bg);
+    FillRect(hdc, &client, background);
+    let _ = DeleteObject(background.into());
+
+    let accent_width = scale_px(4, ui.scale);
+    let mut accent_rect = client;
+    accent_rect.right = accent_rect.left + accent_width;
+    let accent_brush = CreateSolidBrush(accent);
+    FillRect(hdc, &accent_rect, accent_brush);
+    let _ = DeleteObject(accent_brush.into());
+
+    SetBkMode(hdc, TRANSPARENT);
+    let pad = scale_px(16, ui.scale);
+    let has_account = !ui.account.trim().is_empty();
+    let mut title_rect = RECT {
+      left: client.left + pad + accent_width,
+      top: client.top + scale_px(10, ui.scale),
+      right: client.right - pad,
+      bottom: client.top + scale_px(34, ui.scale),
+    };
+    let mut body_rect = RECT {
+      left: title_rect.left,
+      top: title_rect.bottom,
+      right: title_rect.right,
+      bottom: if has_account {
+        client.bottom - scale_px(28, ui.scale)
+      } else {
+        client.bottom - scale_px(12, ui.scale)
+      },
+    };
+
+    let title_font = CreateFontW(
+      -scale_px(15, ui.scale),
+      0,
+      0,
+      0,
+      600,
+      0,
+      0,
+      0,
+      DEFAULT_CHARSET,
+      Default::default(),
+      Default::default(),
+      CLEARTYPE_QUALITY,
+      0,
+      w!("Segoe UI"),
+    );
+    let body_font = CreateFontW(
+      -scale_px(13, ui.scale),
+      0,
+      0,
+      0,
+      400,
+      0,
+      0,
+      0,
+      DEFAULT_CHARSET,
+      Default::default(),
+      Default::default(),
+      CLEARTYPE_QUALITY,
+      0,
+      w!("Segoe UI"),
+    );
+
+    SetTextColor(hdc, title_color);
+    let old_font = SelectObject(hdc, title_font.into());
+    let mut title = ui.title.encode_utf16().collect::<Vec<u16>>();
+    DrawTextW(
+      hdc,
+      &mut title,
+      &mut title_rect,
+      DT_LEFT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
+    );
+
+    SetTextColor(hdc, body_color);
+    SelectObject(hdc, body_font.into());
+    let mut body = ui.body.encode_utf16().collect::<Vec<u16>>();
+    DrawTextW(
+      hdc,
+      &mut body,
+      &mut body_rect,
+      DT_LEFT | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
+    );
+
+    let account_font = if has_account {
+      let font = CreateFontW(
+        -scale_px(12, ui.scale),
+        0,
+        0,
+        0,
+        600,
+        0,
+        0,
+        0,
+        DEFAULT_CHARSET,
+        Default::default(),
+        Default::default(),
+        CLEARTYPE_QUALITY,
+        0,
+        w!("Segoe UI"),
+      );
+      let mut account_rect = RECT {
+        left: title_rect.left,
+        top: client.bottom - scale_px(26, ui.scale),
+        right: title_rect.right,
+        bottom: client.bottom - scale_px(8, ui.scale),
+      };
+      SetTextColor(hdc, account_color);
+      SelectObject(hdc, font.into());
+      let mut account = ui.account.encode_utf16().collect::<Vec<u16>>();
+      DrawTextW(
+        hdc,
+        &mut account,
+        &mut account_rect,
+        DT_LEFT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
+      );
+      Some(font)
+    } else {
+      None
+    };
+
+    SelectObject(hdc, old_font);
+    let _ = DeleteObject(title_font.into());
+    let _ = DeleteObject(body_font.into());
+    if let Some(font) = account_font {
+      let _ = DeleteObject(font.into());
+    }
+    let _ = EndPaint(hwnd, &paint);
+  }
 }
 
 #[cfg(windows)]
@@ -244,6 +715,7 @@ fn show_action_center_toast(
   chat_id: Option<String>,
   message_id: Option<i32>,
   is_call: bool,
+  account_name: Option<&str>,
 ) -> Result<(), String> {
   use std::sync::{LazyLock, Mutex};
 
@@ -256,7 +728,7 @@ fn show_action_center_toast(
     LazyLock::new(|| Mutex::new(Vec::new()));
 
   let app_id = app.config().identifier.clone();
-  let xml = build_toast_xml(title, body);
+  let xml = build_toast_xml(title, body, account_name);
   let toast_xml = XmlDocument::new().map_err(|err| err.to_string())?;
   toast_xml
     .LoadXml(&HSTRING::from(xml))
@@ -300,7 +772,7 @@ fn show_action_center_toast(
 }
 
 #[cfg(windows)]
-fn build_toast_xml(title: &str, body: &str) -> String {
+fn build_toast_xml(title: &str, body: &str, account_name: Option<&str>) -> String {
   let title = truncate_chars(title, WINDOWS_TOAST_TITLE_MAX);
   let title = if title.trim().is_empty() {
     crate::DEFAULT_WINDOW_TITLE.to_string()
@@ -308,6 +780,11 @@ fn build_toast_xml(title: &str, body: &str) -> String {
     title
   };
   let body = truncate_chars(body, WINDOWS_TOAST_BODY_MAX);
+  let attribution = account_name
+    .map(str::trim)
+    .filter(|name| !name.is_empty())
+    .map(|name| format!("{} · {}", name, crate::DEFAULT_WINDOW_TITLE))
+    .unwrap_or_else(|| crate::DEFAULT_WINDOW_TITLE.to_string());
 
   format!(
     r#"<toast activationType="foreground" duration="long">
@@ -322,7 +799,7 @@ fn build_toast_xml(title: &str, body: &str) -> String {
 </toast>"#,
     escape_xml(&title),
     escape_xml(&body),
-    escape_xml(crate::DEFAULT_WINDOW_TITLE),
+    escape_xml(&attribution),
   )
 }
 

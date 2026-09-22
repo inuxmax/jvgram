@@ -504,6 +504,7 @@
 "DataSettings" = "Data and Storage";
 "PrivacySettings" = "Privacy and Security";
 "Language" = "Language";
+"SettingsChangeLang" = "Change Language";
 "SettingsExperimental" = "Experimental settings";
 "PrivacyPhone" = "Phone Number";
 "PrivacyLastSeen" = "Last Seen & Online";
@@ -886,6 +887,7 @@
 "MessageScheduleSend" = "Send Now";
 "MessageScheduleEditTime" = "Reschedule";
 "Reply" = "Reply";
+"ContextQuoteAndReply" = "Quote and Reply";
 "Edit" = "Edit";
 "AddToFavorites" = "Add to Favorites";
 "ContextSaveGif" = "Save GIF";

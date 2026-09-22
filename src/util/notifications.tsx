@@ -32,6 +32,7 @@ import {
   selectSender,
   selectSettingsKeys,
   selectTopicFromMessage,
+  selectUser,
 } from '../global/selectors';
 import { callApi } from '../api/gramjs';
 import { IS_TAURI } from './browser/globalEnvironment';
@@ -40,6 +41,7 @@ import jsxToHtml from './element/jsxToHtml';
 import { buildCollectionByKey } from './iteratees';
 import { getTranslationFn } from './localization';
 import * as mediaLoader from './mediaLoader';
+import { ACCOUNT_SLOT, getAccountDisplayName, getAccountsInfo } from './multiaccount';
 import { oldTranslate } from './oldLangProvider';
 import { debounce } from './schedulers';
 import { getServerTime } from './serverTime';
@@ -433,6 +435,16 @@ function getDesktopToastTheme(): 'light' | 'dark' {
   return document.documentElement.classList.contains('theme-light') ? 'light' : 'dark';
 }
 
+function getCurrentAccountDisplayName() {
+  const global = getGlobal();
+  const account = getAccountsInfo()[ACCOUNT_SLOT || 1];
+  const labeled = account ? getAccountDisplayName(account) : undefined;
+  if (labeled) return labeled;
+
+  const currentUser = global.currentUserId ? selectUser(global, global.currentUserId) : undefined;
+  return getUserFullName(currentUser) || undefined;
+}
+
 async function showNativeDesktopNotification({
   title,
   body,
@@ -454,6 +466,7 @@ async function showNativeDesktopNotification({
 }) {
   const theme = getDesktopToastTheme();
   const avatarDataUrl = await mediaUrlToDataUrl(avatarUrl);
+  const accountName = getCurrentAccountDisplayName();
 
   try {
     await window.tauri.showDesktopNotification({
@@ -464,6 +477,7 @@ async function showNativeDesktopNotification({
       isCall,
       theme,
       avatarDataUrl,
+      accountName,
     });
   } catch (err) {
     if (DEBUG) {

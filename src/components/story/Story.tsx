@@ -737,7 +737,7 @@ function Story({
             )}
             {canDownload && (
               <MenuItem icon="download" disabled={!downloadMediaData} onClick={handleDownload}>
-                {oldLang('lng_media_download')}
+                {lang('MediaDownload')}
               </MenuItem>
             )}
             {!isOut && isUserStory && (
@@ -745,7 +745,7 @@ function Story({
                 {oldLang('StealthMode')}
               </MenuItem>
             )}
-            {!isOut && <MenuItem icon="flag" onClick={handleReportStoryClick}>{oldLang('lng_report_story')}</MenuItem>}
+            {!isOut && <MenuItem icon="flag" onClick={handleReportStoryClick}>{lang('ContextReportMsg')}</MenuItem>}
             {isOut && (
               <MenuItem
                 icon="delete"

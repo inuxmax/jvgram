@@ -33,6 +33,7 @@ export default function initTauriApi() {
     isCall?: boolean;
     theme?: 'light' | 'dark';
     avatarDataUrl?: string;
+    accountName?: string;
   }) {
     const core = await corePromise;
     return core.invoke<void>('show_desktop_notification', options);

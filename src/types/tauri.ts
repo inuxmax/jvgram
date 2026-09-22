@@ -32,6 +32,7 @@ type TauriApi = {
     isCall?: boolean;
     theme?: 'light' | 'dark';
     avatarDataUrl?: string;
+    accountName?: string;
   }) => Promise<void>;
   isAppWindowActive: () => Promise<boolean>;
 };
