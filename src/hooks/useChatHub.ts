@@ -253,12 +253,7 @@ export default function useChatHub() {
     openEmbeddedChat(chat);
   });
 
-  const selectChat = useLastCallback((chat: UnifiedChat, shouldOpen?: boolean) => {
-    if (shouldOpen === false) {
-      chatHubStore.openHubChat(chat.key);
-      return;
-    }
-
+  const selectChat = useLastCallback((chat: UnifiedChat) => {
     const liveChat = !chat.isLive ? getGlobal().chats.byId[chat.chatId] : undefined;
     if (liveChat && (chat.type === 'group' || chat.type === 'channel')) {
       openLivePeer(chat);

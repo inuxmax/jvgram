@@ -348,9 +348,50 @@ function readWindowEmbed() {
 }
 
 export const IS_CHAT_HUB_EMBED = readWindowEmbed();
+export const CHAT_HUB_EMBED_OPEN_EVENT = 'jvgram-chathub-open-chat';
+export const CHAT_HUB_EMBED_READY_EVENT = 'jvgram-chathub-embed-ready';
 
 if (IS_CHAT_HUB_EMBED && typeof document !== 'undefined') {
   document.documentElement.classList.add('chathub-embed');
+}
+
+export function postChatHubEmbedOpen(target: Window | undefined, chatId: string) {
+  if (!target || !chatId.match(/^-?\d+$/)) return;
+  target.postMessage({
+    type: CHAT_HUB_EMBED_OPEN_EVENT,
+    chatId,
+  }, window.location.origin);
+}
+
+export function postChatHubEmbedReady() {
+  if (!window.parent || window.parent === window) return;
+  window.parent.postMessage({
+    type: CHAT_HUB_EMBED_READY_EVENT,
+  }, window.location.origin);
+}
+
+export function readChatHubEmbedOpenChatId(data: unknown) {
+  if (!data || typeof data !== 'object') return undefined;
+  const payload = data as { type?: unknown; chatId?: unknown };
+  if (payload.type !== CHAT_HUB_EMBED_OPEN_EVENT || typeof payload.chatId !== 'string') {
+    return undefined;
+  }
+  return payload.chatId.match(/^-?\d+$/) ? payload.chatId : undefined;
+}
+
+export function isChatHubEmbedReadyMessage(data: unknown) {
+  return Boolean(data && typeof data === 'object' && (data as { type?: unknown }).type === CHAT_HUB_EMBED_READY_EVENT);
+}
+
+export function readChatIdFromLocation() {
+  const hashChatId = window.location.hash.replace(/^#/, '').split('_')[0];
+  if (hashChatId.match(/^-?\d+$/)) return hashChatId;
+  try {
+    const queryChatId = new URLSearchParams(window.location.search).get('chat');
+    return queryChatId?.match(/^-?\d+$/) ? queryChatId : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function readWindowWorkspace(): ChatHubWorkspace | undefined {

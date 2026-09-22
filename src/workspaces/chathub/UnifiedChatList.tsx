@@ -129,10 +129,10 @@ const UnifiedChatList = ({ hub }: OwnProps) => {
                   style={rowStyle}
                   onMouseDownCapture={(e) => {
                     if (e.button !== 0) return;
-                    hub.selectChat(chat, false);
+                    hub.selectChat(chat);
                   }}
                   onClickCapture={() => {
-                    hub.selectChat(chat, false);
+                    hub.selectChat(chat);
                   }}
                 >
                   <Chat

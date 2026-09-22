@@ -10,9 +10,8 @@ import { getActions, getGlobal, withGlobal } from '../../global';
 
 import type { ApiChatFolder, ApiLimitTypeWithModal, ApiStarGiftAuctionState, ApiUser } from '../../api/types';
 import type { TabState } from '../../global/types';
-import { LeftColumnContent } from '../../types';
-
 import { MAIN_THREAD_ID } from '../../api/types';
+import { LeftColumnContent, LoadMoreDirection } from '../../types';
 
 import { BASE_EMOJI_KEYWORD_LANG, DEBUG, FOLDERS_POSITION_LEFT, INACTIVE_MARKER } from '../../config';
 import { requestNextMutation } from '../../lib/fasterdom/fasterdom';
@@ -40,7 +39,15 @@ import { IS_TAURI } from '../../util/browser/globalEnvironment';
 import { IFRAME_ALLOW_ATTRIBUTES } from '../../util/browser/iframe';
 import { IS_ANDROID, IS_MAC_OS, IS_WAVE_TRANSFORM_SUPPORTED } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
-import { buildChatHubAccountChatUrl, IS_CHAT_HUB_EMBED } from '../../util/chatHub';
+import {
+  buildChatHubAccountChatUrl,
+  IS_CHAT_HUB_EMBED,
+  isChatHubEmbedReadyMessage,
+  postChatHubEmbedOpen,
+  postChatHubEmbedReady,
+  readChatHubEmbedOpenChatId,
+  readChatIdFromLocation,
+} from '../../util/chatHub';
 import { waitForTransitionEnd } from '../../util/cssAnimationEndListeners';
 import { processDeepLink } from '../../util/deeplink';
 import { Bundles, loadBundle } from '../../util/moduleLoader';
@@ -298,22 +305,96 @@ const Main = ({
     : undefined;
   const embedFrameRef = useRef<HTMLIFrameElement>();
   const lastEmbedAccountIdRef = useRef<string>();
+  const isEmbedReadyRef = useRef(false);
   const [embedFrameSrc, setEmbedFrameSrc] = useState<string>();
 
+  const syncEmbeddedChat = useLastCallback((chatId?: string) => {
+    if (!chatId) return;
+    const frame = embedFrameRef.current;
+    if (!frame?.contentWindow) return;
+    frame.contentWindow.location.hash = createLocationHash(chatId, 'thread', MAIN_THREAD_ID);
+    postChatHubEmbedOpen(frame.contentWindow, chatId);
+  });
+
   useLayoutEffect(() => {
-    if (!isChatHubOpen || !embeddedChat || !embeddedChatSrc) return;
+    if (!isChatHubOpen || !embeddedChat || !embeddedChatSrc) {
+      if (!isChatHubOpen) {
+        lastEmbedAccountIdRef.current = undefined;
+        isEmbedReadyRef.current = false;
+      }
+      return;
+    }
 
     const frame = embedFrameRef.current;
     const isSameAccount = lastEmbedAccountIdRef.current === embeddedChat.accountId;
     lastEmbedAccountIdRef.current = embeddedChat.accountId;
 
-    if (isSameAccount && frame?.contentWindow) {
-      frame.contentWindow.location.hash = createLocationHash(embeddedChat.chatId, 'thread', MAIN_THREAD_ID);
+    if (isSameAccount && isEmbedReadyRef.current && frame?.contentWindow) {
+      syncEmbeddedChat(embeddedChat.chatId);
       return;
     }
 
+    isEmbedReadyRef.current = false;
     setEmbedFrameSrc(embeddedChatSrc);
-  }, [embeddedChat, embeddedChatSrc, isChatHubOpen]);
+  }, [embeddedChat, embeddedChatSrc, isChatHubOpen, syncEmbeddedChat]);
+
+  const handleEmbedLoad = useLastCallback(() => {
+    isEmbedReadyRef.current = true;
+    syncEmbeddedChat(embeddedChat?.chatId);
+  });
+
+  useEffect(() => {
+    if (IS_CHAT_HUB_EMBED) return undefined;
+
+    const handleEmbedReady = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (!isChatHubEmbedReadyMessage(event.data)) return;
+      isEmbedReadyRef.current = true;
+      syncEmbeddedChat(embeddedChat?.chatId);
+    };
+
+    window.addEventListener('message', handleEmbedReady);
+    return () => window.removeEventListener('message', handleEmbedReady);
+  }, [embeddedChat?.chatId, syncEmbeddedChat]);
+
+  useEffect(() => {
+    if (!IS_CHAT_HUB_EMBED) return undefined;
+
+    const { openChat, loadViewportMessages } = getActions();
+    const openEmbeddedChatId = (chatId: string) => {
+      openChat({ id: chatId, shouldReplaceHistory: true });
+      loadViewportMessages({
+        chatId,
+        threadId: MAIN_THREAD_ID,
+        direction: LoadMoreDirection.Around,
+      });
+    };
+
+    postChatHubEmbedReady();
+    const initialChatId = readChatIdFromLocation();
+    if (initialChatId) {
+      openEmbeddedChatId(initialChatId);
+    }
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const chatId = readChatHubEmbedOpenChatId(event.data);
+      if (!chatId) return;
+      openEmbeddedChatId(chatId);
+    };
+
+    const handleHashChange = () => {
+      const chatId = readChatIdFromLocation();
+      if (chatId) openEmbeddedChatId(chatId);
+    };
+
+    window.addEventListener('message', handleMessage);
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isChatHubOpen || leftColumnContentKey === LeftColumnContent.ChatList) {
@@ -689,6 +770,7 @@ const Main = ({
           src={embedFrameSrc}
           title={lang('ChatHub')}
           allow={IFRAME_ALLOW_ATTRIBUTES}
+          onLoad={handleEmbedLoad}
         />
       )}
       <div className={buildClassName('telegramWorkspace', isChatHubOpen && 'telegramWorkspaceChatHub')}>
